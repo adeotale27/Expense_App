@@ -8,6 +8,7 @@ import '../features/developer/developer_screen.dart';
 import '../features/expenses/add_expense_screen.dart';
 import '../features/expenses/expense_detail_screen.dart';
 import '../features/expenses/expenses_screen.dart';
+import '../features/expenses/widget_compose_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/opportunities/inbox_screen.dart';
@@ -55,6 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ]),
         ],
       ),
+      GoRoute(path: '/compose', builder: (_, __) => const WidgetComposeScreen()),
       GoRoute(
         path: '/add',
         builder: (_, s) => AddExpenseScreen(

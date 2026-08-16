@@ -1,16 +1,16 @@
-# Firebase (optional)
+# Firebase (optional cloud)
 
-SpendPing runs fully offline without Firebase. Configure Firebase when you want Apple/Google sign-in and multi-device restore.
+SpendPing runs fully offline without Firebase. Add Firebase when you want Google/Apple accounts to restore on another phone.
 
 1. Create a Firebase project.
-2. Add iOS app id `com.spendping.spendping` and Android app id `com.spendping.spendping`.
-3. Download `GoogleService-Info.plist` into `ios/Runner/`.
-4. Download `google-services.json` into `android/app/`.
-5. Enable Authentication: Apple, Google, Email/password.
-6. Create a Firestore database in production mode and deploy `firebase/firestore.rules`.
-7. Add the Google Services Gradle plugin if you use Crashlytics later.
-8. Run `flutterfire configure` or add `lib/firebase_options.dart`.
+2. Android package / iOS bundle: `com.spendping.spendping`.
+3. Download `google-services.json` → `android/app/`.
+4. Download `GoogleService-Info.plist` → `ios/Runner/`.
+5. Authentication: enable **Google** (and Apple on iOS). Add SHA-1/SHA-256 including Play App Signing.
+6. Create a **Web client** OAuth ID and pass it as `GOOGLE_WEB_CLIENT_ID` at build time (see `docs/PLAY_STORE.md`).
+7. On iOS, add the reversed client ID URL scheme from `GoogleService-Info.plist` (`REVERSED_CLIENT_ID`) to `CFBundleURLTypes`.
+8. Firestore: production mode + `firebase/firestore.rules`.
 
-Until those files exist, `FirebaseBootstrap.tryInit()` fails closed and the app uses local accounts plus on-device SQLite.
+Until those files exist, `FirebaseBootstrap.tryInit()` fails closed. Google Sign-In on Android still opens the account picker and stores the Google profile on this device.
 
 Do not commit admin SDK keys or service-account JSON.

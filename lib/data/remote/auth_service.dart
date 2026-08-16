@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import '../../app/google_oauth.dart';
 import '../../core/logging/app_log.dart';
 import '../../core/utils/ids.dart';
 import '../../domain/entities/entities.dart';
@@ -172,25 +173,35 @@ class AuthService {
   }
 
   Future<UserProfile> signInGoogle() async {
-    if (!FirebaseBootstrap.available) {
-      throw Exception(
-        'Google Sign-In needs Firebase. Use email or continue locally for now.',
-      );
-    }
-    final googleUser = await GoogleSignIn().signIn();
+    final google = GoogleSignIn(
+      scopes: const ['email', 'profile'],
+      serverClientId: GoogleOAuth.webClientId.isEmpty ? null : GoogleOAuth.webClientId,
+    );
+    final googleUser = await google.signIn();
     if (googleUser == null) {
       throw Exception('Google sign-in cancelled');
     }
     final googleAuth = await googleUser.authentication;
-    final cred = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-    final userCred = await FirebaseAuth.instance.signInWithCredential(cred);
+    if (FirebaseBootstrap.available && googleAuth.idToken != null) {
+      final cred = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCred = await FirebaseAuth.instance.signInWithCredential(cred);
+      final user = UserProfile(
+        id: userCred.user!.uid,
+        displayName: userCred.user!.displayName ?? googleUser.displayName ?? 'You',
+        email: userCred.user!.email,
+        provider: AuthProviderType.google,
+        createdAt: DateTime.now().toUtc(),
+      );
+      await session.save(user);
+      return user;
+    }
     final user = UserProfile(
-      id: userCred.user!.uid,
-      displayName: userCred.user!.displayName ?? googleUser.displayName ?? 'You',
-      email: userCred.user!.email,
+      id: 'google-${googleUser.id}',
+      displayName: googleUser.displayName ?? 'You',
+      email: googleUser.email,
       provider: AuthProviderType.google,
       createdAt: DateTime.now().toUtc(),
     );
@@ -229,6 +240,9 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    try {
+      await GoogleSignIn().signOut();
+    } catch (_) {}
     if (FirebaseBootstrap.available) {
       await FirebaseAuth.instance.signOut();
     }

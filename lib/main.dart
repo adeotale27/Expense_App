@@ -102,6 +102,12 @@ class _MergedLocationProvider implements LocationProvider {
   }
 
   @override
+  Future<GeoFix?> getPreciseLocation() async {
+    return await simulator.getPreciseLocation() ??
+        await platform.getPreciseLocation();
+  }
+
+  @override
   Future<bool> hasPermission() => platform.hasPermission();
 
   @override

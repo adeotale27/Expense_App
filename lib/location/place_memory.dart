@@ -14,11 +14,13 @@ class PlaceMemory {
     required this.places,
     required this.classifier,
     ReverseGeocode? geocode,
+    this.precise,
   }) : geocode = geocode ?? ReverseGeocode(classifier: classifier);
 
   final PlaceRepository places;
   final PlaceClassifier classifier;
   final ReverseGeocode geocode;
+  final Future<GeoFix?> Function()? precise;
 
   GeoFix? _unknownStart;
 
@@ -60,18 +62,32 @@ class PlaceMemory {
     final dwell = fix.timestamp.difference(_unknownStart!.timestamp);
     if (dwell.inMinutes < minStopMinutes) return null;
 
-    final hint = await geocode.nameFor(
-      latitude: _unknownStart!.latitude,
-      longitude: _unknownStart!.longitude,
-    );
+    var lat = _unknownStart!.latitude;
+    var lng = _unknownStart!.longitude;
+    try {
+      final refined = await precise?.call();
+      if (refined != null) {
+        final jump = haversineMeters(lat, lng, refined.latitude, refined.longitude);
+        if (jump < 120) {
+          lat = refined.latitude;
+          lng = refined.longitude;
+        }
+      }
+    } catch (_) {}
+
+    final hint = await geocode.nameFor(latitude: lat, longitude: lng);
+    final commercial = hint.$2 == PlaceType.food ||
+        hint.$2 == PlaceType.cafe ||
+        hint.$2 == PlaceType.fuel ||
+        hint.$2 == PlaceType.grocery;
     final place = Place(
       id: newId(),
       userId: userId,
       name: hint.$1,
       type: hint.$2,
-      latitude: _unknownStart!.latitude,
-      longitude: _unknownStart!.longitude,
-      radius: 150,
+      latitude: lat,
+      longitude: lng,
+      radius: commercial ? 70 : 120,
       visitCount: 1,
       firstVisitedAt: _unknownStart!.timestamp.toUtc(),
       lastVisitedAt: fix.timestamp.toUtc(),

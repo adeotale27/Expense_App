@@ -21,6 +21,10 @@ Future<void> publishTodayTotal(int minorUnits) async {
 Future<void> handleLaunchUri(WidgetRef ref, String raw) async {
   final uri = Uri.tryParse(raw);
   if (uri == null || uri.scheme != 'spendping') return;
+  if (uri.host == 'compose') {
+    ref.read(pendingRouteProvider.notifier).state = '/compose';
+    return;
+  }
   final amount = int.tryParse(uri.queryParameters['amount'] ?? '');
   final what = uri.queryParameters['what'] ?? uri.queryParameters['category'];
   final quick = uri.host == 'quick' || uri.queryParameters['quick'] == '1';

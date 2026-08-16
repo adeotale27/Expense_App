@@ -6,8 +6,8 @@ SpendPing uses location to notice that you visited a grocery store or petrol pum
 
 ## What we store
 
-On device: places you name or that the app learns, visit duration, opportunity records.
-Not uploaded by default: raw latitude/longitude streams.
+On device: places you name or that the app learns (including a Google Places name when you stay at a restaurant), visit duration, opportunity records.
+Not uploaded by default: raw latitude/longitude streams. Nearby Search only runs if you add a Places API key; the request is lat/lng + radius, not a GPS history dump.
 
 ## If you deny location
 

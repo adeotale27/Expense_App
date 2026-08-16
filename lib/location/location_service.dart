@@ -50,7 +50,11 @@ class LocationRuntime {
   final classifier = PlaceClassifier();
   final geofences = GeofenceManager();
   final confidence = BehaviorConfidence();
-  late final memory = PlaceMemory(places: places, classifier: classifier);
+  late final memory = PlaceMemory(
+    places: places,
+    classifier: classifier,
+    precise: provider.getPreciseLocation,
+  );
   late final prompts = SmartPromptManager(intel);
 
   LocationState state = LocationState.unknown;
