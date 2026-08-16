@@ -62,6 +62,7 @@ class LocationRuntime {
   StreamSubscription<GeoFix>? _sub;
 
   Future<void> start() async {
+    if (_sub != null) return;
     final settings = await settingsRepo.get(userId);
     if (!settings.backgroundLocation) return;
     final known = await places.all();

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const primary = Color(0xFF6D5EF7);
-  static const mint = Color(0xFF1ED6A5);
-  static const coral = Color(0xFFFF7A59);
-  static const ink = Color(0xFF10121A);
-  static const fog = Color(0xFFF4F5FA);
-  static const darkCanvas = Color(0xFF0B0D14);
-  static const darkCard = Color(0xFF151823);
-  static const success = Color(0xFF1B7F4E);
-  static const warning = Color(0xFFC27803);
-  static const error = Color(0xFFB42318);
+  /// Splitwise-adjacent teal for money/trust, Spendee-like energy on accents.
+  static const primary = Color(0xFF0FBE8F);
+  static const primaryDeep = Color(0xFF0A8F6C);
+  static const mint = Color(0xFF3EE0B0);
+  static const coral = Color(0xFFFF6B57);
+  static const violet = Color(0xFF6D5EF7);
+  static const ink = Color(0xFF0E1A16);
+  static const fog = Color(0xFFF3FBF8);
+  static const darkCanvas = Color(0xFF07120F);
+  static const darkCard = Color(0xFF10241E);
+  static const success = Color(0xFF12805C);
+  static const warning = Color(0xFFE0A106);
+  static const error = Color(0xFFD64545);
 }
 
 class AppTheme {
@@ -21,12 +24,12 @@ class AppTheme {
       brightness: Brightness.light,
       primary: AppColors.primary,
       onPrimary: Colors.white,
-      primaryContainer: Color(0xFFE8E4FF),
-      onPrimaryContainer: Color(0xFF241B63),
-      secondary: AppColors.mint,
-      onSecondary: Color(0xFF06281F),
-      secondaryContainer: Color(0xFFD4F8EC),
-      onSecondaryContainer: Color(0xFF053226),
+      primaryContainer: Color(0xFFD4F8EC),
+      onPrimaryContainer: Color(0xFF04382B),
+      secondary: AppColors.violet,
+      onSecondary: Colors.white,
+      secondaryContainer: Color(0xFFE8E4FF),
+      onSecondaryContainer: Color(0xFF241B63),
       tertiary: AppColors.coral,
       onTertiary: Colors.white,
       error: AppColors.error,
@@ -34,10 +37,10 @@ class AppTheme {
       surface: AppColors.fog,
       onSurface: AppColors.ink,
       surfaceContainerLowest: Colors.white,
-      surfaceContainerLow: Color(0xFFEBEDF5),
-      surfaceContainerHighest: Color(0xFFE2E5F0),
-      outline: Color(0xFFC5CAD8),
-      outlineVariant: Color(0xFFDDE1EC),
+      surfaceContainerLow: Color(0xFFE7F6F0),
+      surfaceContainerHighest: Color(0xFFD5EEE5),
+      outline: Color(0xFFB7D4C8),
+      outlineVariant: Color(0xFFD7EDE4),
     );
     return _base(scheme, dark: false);
   }
@@ -45,25 +48,25 @@ class AppTheme {
   static ThemeData dark() {
     const scheme = ColorScheme(
       brightness: Brightness.dark,
-      primary: Color(0xFFB3A8FF),
-      onPrimary: Color(0xFF1B1648),
-      primaryContainer: Color(0xFF3D348F),
-      onPrimaryContainer: Color(0xFFEDE9FF),
-      secondary: Color(0xFF5EE6C3),
-      onSecondary: Color(0xFF06281F),
-      secondaryContainer: Color(0xFF0F3D32),
-      onSecondaryContainer: Color(0xFFD4F8EC),
+      primary: Color(0xFF5EE6C3),
+      onPrimary: Color(0xFF043226),
+      primaryContainer: Color(0xFF0F3D32),
+      onPrimaryContainer: Color(0xFFD4F8EC),
+      secondary: Color(0xFFB3A8FF),
+      onSecondary: Color(0xFF1B1648),
+      secondaryContainer: Color(0xFF3D348F),
+      onSecondaryContainer: Color(0xFFEDE9FF),
       tertiary: Color(0xFFFF9B80),
       onTertiary: Color(0xFF3A1208),
       error: Color(0xFFFF8A80),
       onError: Color(0xFF3B0A08),
       surface: AppColors.darkCanvas,
-      onSurface: Color(0xFFF2F4FA),
+      onSurface: Color(0xFFEFFAF5),
       surfaceContainerLowest: AppColors.darkCard,
-      surfaceContainerLow: Color(0xFF1B1F2C),
-      surfaceContainerHighest: Color(0xFF262B3A),
-      outline: Color(0xFF3C4254),
-      outlineVariant: Color(0xFF2A3040),
+      surfaceContainerLow: Color(0xFF16352C),
+      surfaceContainerHighest: Color(0xFF1D4338),
+      outline: Color(0xFF2E5A4C),
+      outlineVariant: Color(0xFF1A3A31),
     );
     return _base(scheme, dark: true);
   }
@@ -82,37 +85,39 @@ class AppTheme {
         titleTextStyle: TextStyle(
           fontSize: 24,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.4,
+          letterSpacing: -0.5,
           color: scheme.onSurface,
         ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
         color: scheme.surfaceContainerLowest,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.primary.withValues(alpha: dark ? 0.28 : 0.14),
+        backgroundColor: scheme.surfaceContainerLowest,
+        indicatorColor: scheme.primary.withValues(alpha: dark ? 0.28 : 0.16),
         labelTextStyle: WidgetStateProperty.resolveWith((s) {
           final selected = s.contains(WidgetState.selected);
           return TextStyle(
             fontSize: 12,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
           );
         }),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          minimumSize: const Size.fromHeight(48),
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: scheme.surfaceContainerLowest,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
       ),

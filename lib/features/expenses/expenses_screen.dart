@@ -43,7 +43,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final catMap = {for (final c in cats) c.id: c};
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Expenses'),
+        title: const Text('Spends'),
         actions: [
           IconButton(
             onPressed: () => context.push('/search'),
@@ -54,7 +54,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -100,22 +100,35 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                     subtitle: 'Add one from Home — it works offline.',
                   );
                 }
-                return ListView.builder(
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 108),
                   itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, i) {
                     final e = items[i];
                     final cat = catMap[e.categoryId];
-                    return ListTile(
-                      title: Text('${cat?.icon ?? ''} ${cat?.name ?? 'Expense'}'.trim()),
-                      subtitle: Text(
-                        '${formatDay(e.timestamp.toLocal())} · ${formatTime(e.timestamp.toLocal())}',
-                      ),
-                      trailing: Text(
-                        e.amount.format(),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                    return QuietCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       onTap: () => context.push('/expenses/${e.id}'),
-                      onLongPress: () => _actions(e),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        leading: CircleAvatar(
+                          backgroundColor: Color(cat?.accentColor ?? 0xFF0FBE8F).withValues(alpha: 0.18),
+                          child: Text(cat?.icon ?? '•'),
+                        ),
+                        title: Text(
+                          cat?.name ?? 'Expense',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          '${formatDay(e.timestamp.toLocal())} · ${formatTime(e.timestamp.toLocal())}',
+                        ),
+                        trailing: Text(
+                          e.amount.format(),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                        ),
+                        onLongPress: () => _actions(e),
+                      ),
                     );
                   },
                 );
@@ -123,10 +136,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/add'),
-        child: const Icon(Icons.add),
       ),
     );
   }

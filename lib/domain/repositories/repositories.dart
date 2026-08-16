@@ -83,6 +83,7 @@ abstract class PersonRepository {
 
 abstract class LedgerRepository {
   Stream<List<LedgerEntry>> watchForPerson(String personId);
+  Stream<List<LedgerEntry>> watchAll();
   Future<List<LedgerEntry>> all();
   Future<void> add(LedgerEntry entry);
   Future<int> balanceMinorFor(String personId);

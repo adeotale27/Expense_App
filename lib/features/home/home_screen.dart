@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   var _bootstrapped = false;
+  final amount = TextEditingController();
+  String? categoryId;
 
   @override
   void didChangeDependencies() {
@@ -33,20 +36,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Future.microtask(_bootstrap);
   }
 
+  @override
+  void dispose() {
+    amount.dispose();
+    super.dispose();
+  }
+
   Future<void> _bootstrap() async {
-    final cats = ref.read(categoryRepoProvider);
-    await cats.ensureDefaults();
+    await ref.read(categoryRepoProvider).ensureDefaults();
     final settings = await ref.read(settingsRepoProvider).get(ref.read(userIdProvider));
     if (!settings.onboardingComplete) {
       await ref.read(settingsRepoProvider).save(settings.copyWith(onboardingComplete: true));
-      if (mounted) await _maybeHome(settings);
+      if (mounted) await _maybeHome();
     }
     try {
       await ref.read(syncEngineProvider).syncAll();
     } catch (_) {}
   }
 
-  Future<void> _maybeHome(settings) async {
+  Future<void> _maybeHome() async {
     final go = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
@@ -79,18 +87,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (go != true) return;
     final loc = await ref.read(locationProviderAdapter).getCurrentLocation();
     if (loc == null) return;
-    final place = await ref.read(locationRuntimeReadyProvider).rememberUnknown(
-          loc,
-          'Home',
-        );
+    final place = await ref.read(locationRuntimeReadyProvider).rememberUnknown(loc, 'Home');
     final latest = await ref.read(settingsRepoProvider).get(ref.read(userIdProvider));
     await ref.read(settingsRepoProvider).save(latest.copyWith(homePlaceId: place.id));
   }
 
-  Future<void> _quick(int minor) async {
-    AppHaptics.tap();
-    if (!mounted) return;
-    context.push('/add?amount=$minor');
+  double get major => double.tryParse(amount.text.trim()) ?? 0;
+
+  Future<void> _enableLocation() async {
+    final ok = await ref.read(locationProviderAdapter).requestPermission();
+    if (!ok) return;
+    final settings = await ref.read(settingsRepoProvider).get(ref.read(userIdProvider));
+    await ref.read(settingsRepoProvider).save(settings.copyWith(backgroundLocation: true));
+    await ref.read(locationRuntimeReadyProvider).start();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _recordQuick() async {
+    if (major <= 0) {
+      context.push('/add');
+      return;
+    }
+    final cats = ref.read(categoriesProvider).valueOrNull ?? [];
+    final settings = ref.read(settingsProvider).valueOrNull;
+    final expenses = ref.read(recentExpensesProvider).valueOrNull ?? [];
+    final placeList = ref.read(placesProvider).valueOrNull ?? [];
+    final habits = HabitEngine().learn(
+      expenses: expenses,
+      places: placeList,
+      visits: const [],
+      settings: settings,
+    );
+    final catId = categoryId ??
+        habits.recentCategoryId ??
+        habits.frequentCategoryId ??
+        settings?.lastCategoryId ??
+        cats.where((c) => c.name == 'Other').firstOrNull?.id ??
+        (cats.isNotEmpty ? cats.first.id : null);
+    if (catId == null) return;
+    final recorded = Money.fromMajor(major);
+    AppHaptics.confirm();
+    final now = DateTime.now().toUtc();
+    await ref.read(expenseRepoProvider).upsert(
+          Expense(
+            id: newId(),
+            userId: ref.read(userIdProvider),
+            amount: recorded,
+            categoryId: catId,
+            paymentMethod: settings?.lastPaymentMethod ?? PaymentMethod.upi,
+            timestamp: now,
+            createdAt: now,
+            updatedAt: now,
+            deviceId: ref.read(deviceIdProvider),
+          ),
+        );
+    await ref.read(settingsRepoProvider).save(
+          (settings ?? AppSettings(userId: ref.read(userIdProvider))).copyWith(
+            lastCategoryId: catId,
+          ),
+        );
+    amount.clear();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Recorded ${recorded.format()}')),
+      );
+    }
   }
 
   @override
@@ -104,7 +165,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final places = {for (final p in placeList) p.id: p};
     final now = DateTime.now();
     final todayStart = startOfLocalDay(now);
-    int today = 0;
+    var today = 0;
     final todayItems = <Expense>[];
     for (final e in expenses) {
       final local = e.timestamp.toLocal();
@@ -115,121 +176,187 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
     todayItems.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final catMap = {for (final c in cats) c.id: c};
+    final settings = ref.watch(settingsProvider).valueOrNull;
     final habits = HabitEngine().learn(
       expenses: expenses,
       places: placeList,
       visits: const [],
+      settings: settings,
     );
+    final selectedCat = categoryId ?? habits.recentCategoryId ?? habits.frequentCategoryId;
     final suggestion = runtime.pendingSuggestion;
     final topOpp = pending.isEmpty ? null : pending.first;
     final place = topOpp == null ? null : places[topOpp.placeId];
+    final here = runtime.currentPlace;
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 108),
+          children: [
+            Text(
+              greetingFor(now),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            GradientHero(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      greetingFor(now),
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                  const Text('TODAY', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.2)),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: () => context.push('/add'),
+                    child: MoneyText(
+                      Money(minorUnits: today),
+                      style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w800, color: Colors.white),
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Search expenses',
-                    onPressed: () => context.push('/search'),
-                    icon: const Icon(Icons.search),
-                  ),
+                  Text('${todayItems.length} spends · tap to add'),
                 ],
               ),
+            ),
+            const SizedBox(height: 14),
+            if (here == null && topOpp == null && suggestion == null)
               QuietCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('TODAY', style: Theme.of(context).textTheme.labelMedium),
-                    MoneyText(Money(minorUnits: today), large: true),
                     Text(
-                      '${todayItems.length} expense${todayItems.length == 1 ? '' : 's'}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
+                      'Location intelligence',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'SpendPing remembers places you visit and asks before logging anything. GPS never creates an expense on its own.',
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.tonal(
+                      onPressed: _enableLocation,
+                      child: const Text('Enable location'),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              QuickAmountRow(
-                minors: habits.typicalQuickAmounts,
-                onAmount: _quick,
-                onCustom: () => context.push('/add'),
-              ),
-              if (suggestion != null) ...[
-                const SizedBox(height: 12),
-                _PromptCard(
-                  title: suggestion.headline,
-                  body: suggestion.body,
-                  onYes: () async {
-                    await runtime.answerSuggestion(suggestion, true);
-                    setState(() {});
-                  },
-                  onNo: () async {
-                    await runtime.answerSuggestion(suggestion, false);
-                    setState(() {});
-                  },
-                ),
-              ] else if (topOpp != null) ...[
-                const SizedBox(height: 12),
-                _PromptCard(
-                  title: '📍 ${place?.name ?? topOpp.suggestedMerchantName ?? 'A place'}',
-                  body: 'Did you spend anything here?',
-                  onYes: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => AddExpenseScreen(opportunity: topOpp),
-                      ),
-                    );
-                  },
-                  onNo: () async {
-                    await ref.read(opportunityRepoProvider).upsert(
-                          topOpp.copyWith(
-                            status: OpportunityStatus.nothingSpent,
-                            updatedAt: DateTime.now().toUtc(),
+              )
+            else if (here != null || topOpp != null || suggestion != null)
+              QuietCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      here != null
+                          ? '📍 ${here.name}'
+                          : suggestion?.headline ??
+                              '📍 ${place?.name ?? topOpp?.suggestedMerchantName ?? 'A place'}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      suggestion?.body ??
+                          (topOpp != null
+                              ? 'Did you spend anything here?'
+                              : 'SpendPing noticed a visit. Nothing is recorded until you confirm.'),
+                    ),
+                    if (suggestion != null || topOpp != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () async {
+                                if (suggestion != null) {
+                                  await runtime.answerSuggestion(suggestion, true);
+                                  setState(() {});
+                                } else if (topOpp != null) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AddExpenseScreen(opportunity: topOpp),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text('Yes, record it'),
+                            ),
                           ),
-                        );
-                  },
-                ),
-              ],
-              const SizedBox(height: 12),
-              Text('Recent', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Expanded(
-                child: todayItems.isEmpty
-                    ? const EmptyState(
-                        title: 'Nothing yet today',
-                        subtitle: 'Tap a quick amount to record a spend in seconds.',
-                      )
-                    : ListView.builder(
-                        itemCount: todayItems.length.clamp(0, 8),
-                        itemBuilder: (context, i) {
-                          final e = todayItems[i];
-                          final cat = catMap[e.categoryId];
-                          return _ExpenseTile(
-                            expense: e,
-                            category: cat,
-                            onTap: () => context.push('/expenses/${e.id}'),
-                            onLongPress: () => _expenseActions(e),
-                          );
-                        },
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () async {
+                                if (suggestion != null) {
+                                  await runtime.answerSuggestion(suggestion, false);
+                                } else if (topOpp != null) {
+                                  await ref.read(opportunityRepoProvider).upsert(
+                                        topOpp.copyWith(
+                                          status: OpportunityStatus.nothingSpent,
+                                          updatedAt: DateTime.now().toUtc(),
+                                        ),
+                                      );
+                                }
+                                setState(() {});
+                              },
+                              child: const Text('Not this time'),
+                            ),
+                          ),
+                        ],
                       ),
+                    ],
+                  ],
+                ),
               ),
-            ],
-          ),
+            const SizedBox(height: 14),
+            QuietCard(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Type an amount', style: Theme.of(context).textTheme.titleSmall),
+                  AmountField(
+                    controller: amount,
+                    large: false,
+                    autofocus: false,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  QuickAmountRow(
+                    minors: habits.typicalQuickAmounts,
+                    onAmount: (m) => setState(() {
+                      amount.text = '${(m / 100).round()}';
+                      amount.selection = TextSelection.collapsed(offset: amount.text.length);
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final c in cats.take(8))
+                        ChoiceChip(
+                          label: Text('${c.icon} ${c.name}'),
+                          selected: (categoryId ?? selectedCat) == c.id,
+                          onSelected: (_) => setState(() => categoryId = c.id),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton(
+                    onPressed: _recordQuick,
+                    child: Text(major > 0 ? 'Record ₹${amount.text}' : 'Open full add'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text('Recent', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            if (todayItems.isEmpty)
+              const Text('Nothing yet today. Type an amount above — it takes a second.')
+            else
+              for (final e in todayItems.take(8))
+                _ExpenseTile(
+                  expense: e,
+                  category: catMap[e.categoryId],
+                  onTap: () => context.push('/expenses/${e.id}'),
+                  onLongPress: () => _expenseActions(e),
+                ),
+          ],
         ),
       ),
     );
@@ -272,41 +399,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _PromptCard extends StatelessWidget {
-  const _PromptCard({
-    required this.title,
-    required this.body,
-    required this.onYes,
-    required this.onNo,
-  });
-  final String title;
-  final String body;
-  final VoidCallback onYes;
-  final VoidCallback onNo;
-
-  @override
-  Widget build(BuildContext context) {
-    return QuietCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(body),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: FilledButton(onPressed: onYes, child: const Text('Yes'))),
-              const SizedBox(width: 8),
-              Expanded(child: OutlinedButton(onPressed: onNo, child: const Text('Not this time'))),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ExpenseTile extends StatelessWidget {
   const _ExpenseTile({
     required this.expense,
@@ -324,7 +416,7 @@ class _ExpenseTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
-        backgroundColor: Color((category?.accentColor ?? 0xFF6D5EF7)).withValues(alpha: 0.18),
+        backgroundColor: Color(category?.accentColor ?? 0xFF0FBE8F).withValues(alpha: 0.18),
         child: Text(category?.icon ?? '•'),
       ),
       title: Text(category?.name ?? expense.merchantName ?? 'Expense'),

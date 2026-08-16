@@ -48,17 +48,31 @@ void main() {
     expect(lent.signedMinor, 200000);
   });
 
-  test('full repayment settles', () {
+  test('settle up reduces what they owe', () {
+    final lent = entry(
+      type: LedgerType.lent,
+      direction: LedgerDirection.owedToUser,
+      minor: 200000,
+    );
+    final settle = entry(
+      type: LedgerType.settlement,
+      direction: LedgerDirection.owedToUser,
+      minor: 200000,
+    );
+    expect(lent.signedMinor + settle.signedMinor, 0);
+  });
+
+  test('settle up reduces what you owe', () {
     final borrowed = entry(
       type: LedgerType.borrowed,
       direction: LedgerDirection.owedByUser,
-      minor: 500000,
+      minor: 150000,
     );
-    final repay = entry(
-      type: LedgerType.repayment,
+    final settle = entry(
+      type: LedgerType.settlement,
       direction: LedgerDirection.owedByUser,
-      minor: 500000,
+      minor: 150000,
     );
-    expect(borrowed.signedMinor + repay.signedMinor, 0);
+    expect(borrowed.signedMinor + settle.signedMinor, 0);
   });
 }

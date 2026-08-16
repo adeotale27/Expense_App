@@ -17,45 +17,78 @@ class PeopleScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final people = ref.watch(peopleProvider).valueOrNull ?? [];
+    final entries = ref.watch(ledgerEntriesProvider).valueOrNull ?? [];
     return Scaffold(
-      appBar: AppBar(title: const Text('People')),
+      appBar: AppBar(
+        title: const Text('Friends'),
+        actions: [
+          IconButton(
+            tooltip: 'Add friend',
+            onPressed: () => _addPerson(context, ref),
+            icon: const Icon(Icons.person_add_alt),
+          ),
+        ],
+      ),
       body: people.isEmpty
           ? EmptyState(
-              title: 'No people yet',
-              subtitle: 'Track money you owe or that others owe you.',
+              title: 'Split like Splitwise',
+              subtitle: 'Add a friend, log who paid, then settle when you actually transfer money.',
               action: FilledButton(
                 onPressed: () => _addPerson(context, ref),
-                child: const Text('Add person'),
+                child: const Text('Add friend'),
               ),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
-              itemCount: people.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) {
-                final p = people[i];
-                return FutureBuilder(
-                  future: Future.wait([
-                    ref.read(ledgerRepoProvider).balanceMinorFor(p.id),
-                    ref.read(ledgerRepoProvider).watchForPerson(p.id).first,
-                  ]),
-                  builder: (context, snap) {
-                    final bal = (snap.data?[0] as int?) ?? 0;
-                    final entries = (snap.data?[1] as List<LedgerEntry>?) ?? const [];
-                    final label = bal == 0
-                        ? 'Settled'
+          : Builder(
+              builder: (context) {
+                final net = entries.fold<int>(0, (p, e) => p + e.signedMinor);
+                final headline = net == 0
+                    ? 'All settled'
+                    : net > 0
+                        ? 'Overall, you are owed ${Money(minorUnits: net).format()}'
+                        : 'Overall, you owe ${Money(minorUnits: -net).format()}';
+                int balanceFor(String id) => entries
+                    .where((e) => e.personId == id)
+                    .fold<int>(0, (p, e) => p + e.signedMinor);
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 108),
+                  itemCount: people.length + 1,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, i) {
+                    if (i == 0) {
+                      return GradientHero(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('BALANCES', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.1)),
+                            const SizedBox(height: 8),
+                            Text(headline, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                            const Text('Ledger only — money still moves outside the app.'),
+                          ],
+                        ),
+                      );
+                    }
+                    final p = people[i - 1];
+                    final bal = balanceFor(p.id);
+                    final color = bal == 0
+                        ? Theme.of(context).colorScheme.onSurface
                         : bal > 0
-                            ? 'They owe ₹${Money(minorUnits: bal).format().replaceAll('₹', '')}'
-                            : 'You owe ₹${Money(minorUnits: -bal).format().replaceAll('₹', '')}';
+                            ? const Color(0xFF0FBE8F)
+                            : const Color(0xFFFF6B57);
+                    final label = bal == 0
+                        ? 'Settled up'
+                        : bal > 0
+                            ? 'owes you ${Money(minorUnits: bal).format()}'
+                            : 'you owe ${Money(minorUnits: -bal).format()}';
                     return QuietCard(
                       onTap: () => context.push('/people/${p.id}'),
                       child: Row(
                         children: [
                           CircleAvatar(
-                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                            radius: 26,
+                            backgroundColor: color.withValues(alpha: 0.16),
                             child: Text(
                               p.name.isEmpty ? '?' : p.name[0].toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.w800),
+                              style: TextStyle(fontWeight: FontWeight.w800, color: color),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -64,14 +97,11 @@ class PeopleScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(p.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
-                                Text(label),
-                                Text(
-                                  '${entries.length} recent transaction${entries.length == 1 ? '' : 's'}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
+                                Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700)),
                               ],
                             ),
                           ),
+                          const Icon(Icons.chevron_right_rounded),
                         ],
                       ),
                     );
@@ -79,11 +109,6 @@ class PeopleScreen extends ConsumerWidget {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _addPerson(context, ref),
-        icon: const Icon(Icons.person_add_alt),
-        label: const Text('Add person'),
-      ),
     );
   }
 }
@@ -101,7 +126,9 @@ Future<void> _addPerson(BuildContext context, WidgetRef ref) async {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Who's this?", style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              Text("Who's this?", style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              const Text('Then you can log I paid / they paid / split equally — same idea as Splitwise, on this device.'),
             const SizedBox(height: 12),
             TextField(
               controller: name,
@@ -161,7 +188,7 @@ Future<void> _firstTransaction(BuildContext context, WidgetRef ref, Person perso
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: () => Navigator.pop(ctx, LedgerType.adjustment),
-                child: const Text('Split something'),
+                child: const Text('Split equally'),
               ),
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Skip for now')),
             ],
@@ -178,9 +205,21 @@ Future<void> _amountSheet(
   BuildContext context,
   WidgetRef ref,
   String personId,
-  LedgerType type,
-) async {
-  final amount = TextEditingController();
+  LedgerType type, {
+  int? suggestedMinor,
+}) async {
+  final amount = TextEditingController(
+    text: suggestedMinor == null || suggestedMinor <= 0
+        ? ''
+        : '${(suggestedMinor / 100).round()}',
+  );
+  final title = switch (type) {
+    LedgerType.lent => 'I paid',
+    LedgerType.borrowed => 'They paid',
+    LedgerType.adjustment => 'Split equally — bill total',
+    LedgerType.settlement => 'Settle up',
+    LedgerType.repayment => 'Repayment',
+  };
   final ok = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -191,12 +230,13 @@ Future<void> _amountSheet(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: amount,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Amount'),
-            ),
+            Text(title, style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            if (type == LedgerType.settlement)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Mark the amount you actually transferred outside SpendPing.'),
+              ),
+            AmountField(controller: amount, large: false, autofocus: true),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -210,22 +250,38 @@ Future<void> _amountSheet(
   final major = double.tryParse(amount.text) ?? 0;
   if (ok != true || major <= 0) return;
   final now = DateTime.now().toUtc();
-  final direction = switch (type) {
-    LedgerType.lent => LedgerDirection.owedToUser,
-    LedgerType.borrowed => LedgerDirection.owedByUser,
-    LedgerType.adjustment => LedgerDirection.owedToUser,
-    LedgerType.repayment => LedgerDirection.owedByUser,
-    LedgerType.settlement => LedgerDirection.owedByUser,
-  };
+  var entryType = type;
+  var entryMajor = major;
+  String? note;
+  if (type == LedgerType.adjustment) {
+    entryType = LedgerType.lent;
+    entryMajor = major / 2;
+    note = 'Split equally of ${Money.fromMajor(major).format()}';
+  }
+  LedgerDirection direction;
+  if (type == LedgerType.settlement) {
+    final current = await ref.read(ledgerRepoProvider).balanceMinorFor(personId);
+    direction = current >= 0 ? LedgerDirection.owedToUser : LedgerDirection.owedByUser;
+    note = 'Settled up';
+  } else {
+    direction = switch (entryType) {
+      LedgerType.lent => LedgerDirection.owedToUser,
+      LedgerType.borrowed => LedgerDirection.owedByUser,
+      LedgerType.adjustment => LedgerDirection.owedToUser,
+      LedgerType.repayment => LedgerDirection.owedByUser,
+      LedgerType.settlement => LedgerDirection.owedToUser,
+    };
+  }
   await ref.read(ledgerRepoProvider).add(
         LedgerEntry(
           id: newId(),
           userId: ref.read(userIdProvider),
           personId: personId,
-          amount: Money.fromMajor(major),
+          amount: Money.fromMajor(entryMajor),
           direction: direction,
-          type: type,
+          type: entryType,
           date: now,
+          note: note,
           createdAt: now,
           updatedAt: now,
           deviceId: ref.read(deviceIdProvider),
@@ -282,6 +338,25 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                 child: Column(
                   children: [
                     Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: GradientHero(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              bal == 0
+                                  ? 'Settled up'
+                                  : bal > 0
+                                      ? 'owes you ${Money(minorUnits: bal).format()}'
+                                      : 'you owe ${Money(minorUnits: -bal).format()}',
+                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                            ),
+                            const Text('Transfers happen in UPI / cash. This is just the IOU list.'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Padding(
                       padding: const EdgeInsets.all(20),
                       child: Row(
                         children: [
@@ -307,20 +382,48 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: () => _amountSheet(context, ref, widget.id, LedgerType.lent),
-                              child: const Text('Add'),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: () => _amountSheet(context, ref, widget.id, LedgerType.lent),
+                                  child: const Text('I paid'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: FilledButton.tonal(
+                                  onPressed: () => _amountSheet(context, ref, widget.id, LedgerType.borrowed),
+                                  child: const Text('They paid'),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _amountSheet(context, ref, widget.id, LedgerType.settlement),
-                              child: const Text('Settle'),
-                            ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _amountSheet(context, ref, widget.id, LedgerType.adjustment),
+                                  child: const Text('Split equally'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => _amountSheet(
+                                    context,
+                                    ref,
+                                    widget.id,
+                                    LedgerType.settlement,
+                                    suggestedMinor: bal.abs(),
+                                  ),
+                                  child: const Text('Settle up'),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

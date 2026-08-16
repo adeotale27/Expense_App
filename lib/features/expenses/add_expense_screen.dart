@@ -10,7 +10,6 @@ import '../../core/utils/money.dart';
 import '../../domain/entities/entities.dart';
 import '../../domain/enums/enums.dart';
 import '../habits/habit_engine.dart';
-import '../shared/action_sheet.dart';
 import '../shared/selection_grids.dart';
 import '../shared/widgets.dart';
 
@@ -33,20 +32,22 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
 }
 
 class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
-  String raw = '';
+  late final TextEditingController amount;
+  final note = TextEditingController();
+  final merchant = TextEditingController();
+  final amountFocus = FocusNode();
   String? categoryId;
   PaymentMethod method = PaymentMethod.upi;
   String? placeId;
   String? personId;
-  bool extras = false;
-  int catFilter = 0;
+  bool splitEqually = false;
+  int step = 0;
   bool saved = false;
-  final note = TextEditingController();
-  final merchant = TextEditingController();
 
   bool get isEdit => widget.expense != null;
 
   double get major {
+    final raw = amount.text.trim();
     if (raw.isEmpty) return 0;
     return double.tryParse(raw) ?? 0;
   }
@@ -54,9 +55,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   @override
   void initState() {
     super.initState();
+    amount = TextEditingController();
     final e = widget.expense;
     if (e != null) {
-      raw = e.amount.majorUnits == e.amount.majorUnits.roundToDouble()
+      amount.text = e.amount.majorUnits == e.amount.majorUnits.roundToDouble()
           ? '${e.amount.majorUnits.round()}'
           : e.amount.majorUnits.toString();
       categoryId = e.categoryId;
@@ -64,17 +66,39 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       placeId = e.placeId;
       note.text = e.note ?? '';
       merchant.text = e.merchantName ?? '';
+      step = 1;
     } else if (widget.initialAmountMinor != null) {
-      raw = '${(widget.initialAmountMinor! / 100).round()}';
+      amount.text = '${(widget.initialAmountMinor! / 100).round()}';
     }
     placeId ??= widget.placeId ?? widget.opportunity?.placeId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && step == 0) amountFocus.requestFocus();
+    });
   }
 
   @override
   void dispose() {
+    amount.dispose();
     note.dispose();
     merchant.dispose();
+    amountFocus.dispose();
     super.dispose();
+  }
+
+  void _digit(String d) {
+    setState(() {
+      if (d == '.' && amount.text.contains('.')) return;
+      amount.text += d;
+      amount.selection = TextSelection.collapsed(offset: amount.text.length);
+    });
+  }
+
+  void _back() {
+    if (amount.text.isEmpty) return;
+    setState(() {
+      amount.text = amount.text.substring(0, amount.text.length - 1);
+      amount.selection = TextSelection.collapsed(offset: amount.text.length);
+    });
   }
 
   Future<void> _save() async {
@@ -109,16 +133,18 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
     await ref.read(expenseRepoProvider).upsert(expense);
     if (personId != null && existing == null) {
+      final share = splitEqually ? major / 2 : major;
       await ref.read(ledgerRepoProvider).add(
             LedgerEntry(
               id: newId(),
               userId: userId,
               personId: personId!,
-              amount: expense.amount,
+              amount: Money.fromMajor(share),
               direction: LedgerDirection.owedToUser,
               type: LedgerType.lent,
               date: now,
               relatedExpenseId: expense.id,
+              note: splitEqually ? 'Split equally' : 'I paid',
               createdAt: now,
               updatedAt: now,
               deviceId: deviceId,
@@ -157,7 +183,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     } catch (_) {}
     if (!mounted) return;
     setState(() => saved = true);
-    await Future<void>.delayed(const Duration(milliseconds: 280));
+    await Future<void>.delayed(const Duration(milliseconds: 240));
     if (mounted) context.pop();
   }
 
@@ -179,7 +205,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     if (widget.expense == null && method == PaymentMethod.upi) {
       method = settings?.lastPaymentMethod ?? method;
     }
-
     final habits = HabitEngine().learn(
       expenses: expenses,
       places: places,
@@ -187,217 +212,169 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       settings: settings,
     );
     final ordered = HabitEngine().orderCategories(cats, habits);
-    final shown = switch (catFilter) {
-      0 => ordered.take(8).toList(),
-      1 => ordered
-          .where((c) =>
-              c.id == habits.frequentCategoryId || c.id == habits.recentCategoryId)
-          .toList(),
-      _ => ordered,
-    };
 
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEdit ? 'Edit expense' : 'How much?'),
+        title: Text(isEdit ? 'Edit spend' : (step == 0 ? 'How much?' : 'What was it?')),
+        leading: step == 1 && !isEdit
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => setState(() => step = 0),
+              )
+            : null,
       ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 720;
-            return Column(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: AnimatedDefaultTextStyle(
-                            duration: const Duration(milliseconds: 180),
-                            style: Theme.of(context).textTheme.displayMedium!.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -1.2,
-                                  color: scheme.onSurface,
-                                ),
-                            child: Text('₹${raw.isEmpty ? '0' : raw}'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        QuickAmountRow(
-                          minors: habits.typicalQuickAmounts,
-                          onAmount: (m) => setState(() {
-                            raw = '${(m / 100).round()}';
-                          }),
-                        ),
-                        SizedBox(height: compact ? 6 : 10),
-                        Expanded(
-                          child: AmountKeypad(
-                            onDigit: (d) {
-                              setState(() {
-                                if (d == '.' && raw.contains('.')) return;
-                                raw += d;
-                              });
-                            },
-                            onBack: () {
-                              if (raw.isEmpty) return;
-                              setState(() => raw = raw.substring(0, raw.length - 1));
-                            },
-                          ),
-                        ),
-                        SegmentedMini(
-                          labels: const ['Recent', 'Frequent', 'All'],
-                          index: catFilter,
-                          onChanged: (i) => setState(() => catFilter = i),
-                        ),
-                        const SizedBox(height: 8),
-                        CategoryGrid(
-                          categories: shown.isEmpty ? ordered : shown,
-                          selectedId: categoryId,
-                          limit: catFilter == 2 ? 12 : 8,
-                          onSelected: (c) => setState(() => categoryId = c.id),
-                        ),
-                        const SizedBox(height: 10),
-                        PaymentMethodGrid(
-                          selected: method,
-                          preferred: [
-                            habits.recentPayment,
-                            habits.frequentPayment,
-                            PaymentMethod.upi,
-                          ],
-                          onSelected: (m) => setState(() => method = m),
-                        ),
-                        TextButton(
-                          onPressed: () => setState(() => extras = !extras),
-                          child: Text(extras ? 'Hide extras' : 'Where? Who? Note?'),
-                        ),
-                        if (extras)
-                          _Extras(
-                            merchant: merchant,
-                            note: note,
-                            places: places,
-                            people: people,
-                            placeId: placeId,
-                            personId: personId,
-                            onPlace: (id) => setState(() => placeId = id),
-                            onPerson: (id) => setState(() => personId = id),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                  child: FilledButton(
-                    onPressed: major > 0 ? _save : null,
-                    child: Text(
-                      saved
-                          ? 'Saved ₹${raw.isEmpty ? '0' : raw}'
-                          : isEdit
-                              ? 'Save changes'
-                              : 'Save',
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+        child: step == 0 ? _amountStep(habits) : _detailsStep(ordered, habits, places, people),
       ),
     );
   }
-}
 
-class _Extras extends StatelessWidget {
-  const _Extras({
-    required this.merchant,
-    required this.note,
-    required this.places,
-    required this.people,
-    required this.placeId,
-    required this.personId,
-    required this.onPlace,
-    required this.onPerson,
-  });
-
-  final TextEditingController merchant;
-  final TextEditingController note;
-  final List<Place> places;
-  final List<Person> people;
-  final String? placeId;
-  final String? personId;
-  final ValueChanged<String?> onPlace;
-  final ValueChanged<String?> onPerson;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (places.isNotEmpty)
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (final p in places.take(12))
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(p.name),
-                      selected: placeId == p.id,
-                      onSelected: (_) => onPlace(placeId == p.id ? null : p.id),
-                    ),
-                  ),
-              ],
-            ),
+  Widget _amountStep(SpendingHabits habits) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      child: Column(
+        children: [
+          AmountField(
+            controller: amount,
+            focusNode: amountFocus,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
           ),
-        if (people.isNotEmpty)
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (final p in people.take(12))
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(p.name),
-                      selected: personId == p.id,
-                      onSelected: (_) => onPerson(personId == p.id ? null : p.id),
-                    ),
-                  ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          QuickAmountRow(
+            minors: habits.typicalQuickAmounts,
+            onAmount: (m) => setState(() {
+              amount.text = '${(m / 100).round()}';
+              amount.selection = TextSelection.collapsed(offset: amount.text.length);
+            }),
           ),
-        TextField(
-          controller: merchant,
-          decoration: const InputDecoration(labelText: 'Merchant (optional)'),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: note,
-          decoration: const InputDecoration(labelText: 'Note (optional)'),
-        ),
-      ],
+          const SizedBox(height: 8),
+          Expanded(
+            child: AmountKeypad(onDigit: _digit, onBack: _back),
+          ),
+          FilledButton(
+            onPressed: major > 0 ? () => setState(() => step = 1) : null,
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
     );
   }
-}
 
-Future<void> confirmHideCategory(BuildContext context, WidgetRef ref, Category c) async {
-  final action = await showActionSheet<String>(
-    context,
-    title: c.name,
-    message: 'This category will stay on past expenses.',
-    actions: const [
-      SheetAction('Edit', 'edit', icon: Icons.edit_outlined),
-      SheetAction('Hide from new expenses', 'hide', icon: Icons.visibility_off_outlined),
-    ],
-  );
-  if (action == 'hide') {
-    await ref.read(categoryRepoProvider).upsert(
-          c.copyWith(isActive: false, updatedAt: DateTime.now().toUtc()),
-        );
+  Widget _detailsStep(
+    List<Category> ordered,
+    SpendingHabits habits,
+    List<Place> places,
+    List<Person> people,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => step = 0),
+            child: AmountField(
+              controller: amount,
+              large: false,
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          Text(
+            'Tap or type to edit the amount',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView(
+              children: [
+                Text('Category', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                CategoryGrid(
+                  categories: ordered,
+                  selectedId: categoryId,
+                  limit: 10,
+                  onSelected: (c) => setState(() => categoryId = c.id),
+                ),
+                const SizedBox(height: 16),
+                Text('Paid with', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                PaymentMethodGrid(
+                  selected: method,
+                  preferred: [
+                    habits.recentPayment,
+                    habits.frequentPayment,
+                    PaymentMethod.upi,
+                  ],
+                  onSelected: (m) => setState(() => method = m),
+                ),
+                if (places.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text('Where', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final p in places.take(10))
+                        ChoiceChip(
+                          label: Text(p.name),
+                          selected: placeId == p.id,
+                          onSelected: (_) =>
+                              setState(() => placeId = placeId == p.id ? null : p.id),
+                        ),
+                    ],
+                  ),
+                ],
+                if (people.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text('Split with a friend', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final p in people.take(10))
+                        ChoiceChip(
+                          label: Text(p.name),
+                          selected: personId == p.id,
+                          onSelected: (_) =>
+                              setState(() => personId = personId == p.id ? null : p.id),
+                        ),
+                    ],
+                  ),
+                  if (personId != null)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Split equally'),
+                      subtitle: Text(
+                        splitEqually
+                            ? 'They owe ${Money.fromMajor(major / 2).format()}'
+                            : 'They owe the full ${Money.fromMajor(major).format()}',
+                      ),
+                      value: splitEqually,
+                      onChanged: (v) => setState(() => splitEqually = v),
+                    ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: merchant,
+                  decoration: const InputDecoration(labelText: 'Merchant (optional)'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: note,
+                  decoration: const InputDecoration(labelText: 'Note (optional)'),
+                ),
+              ],
+            ),
+          ),
+          FilledButton(
+            onPressed: major > 0 ? _save : null,
+            child: Text(saved ? 'Saved' : isEdit ? 'Save changes' : 'Record spend'),
+          ),
+        ],
+      ),
+    );
   }
 }

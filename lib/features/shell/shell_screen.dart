@@ -8,21 +8,41 @@ class ShellScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: navigationShell,
+      floatingActionButton: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: scheme.primary.withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          tooltip: 'Add expense',
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          onPressed: () => context.push('/add'),
+          child: const Icon(Icons.add_rounded, size: 32),
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: navigationShell.goBranch,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+            selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
-            label: 'Expenses',
+            label: 'Spends',
           ),
           NavigationDestination(
             icon: Icon(Icons.place_outlined),
@@ -31,12 +51,12 @@ class ShellScreen extends StatelessWidget {
           ),
           NavigationDestination(
             icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'People',
+            selectedIcon: Icon(Icons.groups_rounded),
+            label: 'Friends',
           ),
           NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz),
+            icon: Icon(Icons.tune_rounded),
+            selectedIcon: Icon(Icons.tune_rounded),
             label: 'More',
           ),
         ],
