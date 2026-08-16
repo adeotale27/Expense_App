@@ -7,6 +7,7 @@ import '../data/repositories/drift_repositories.dart';
 import '../data/repositories/intel_store.dart';
 import '../data/sync/sync_engine.dart';
 import '../domain/entities/entities.dart';
+import '../domain/enums/enums.dart';
 import '../domain/repositories/repositories.dart';
 import '../location/location_provider.dart';
 import '../location/location_service.dart';
@@ -43,7 +44,13 @@ final locationProviderAdapter = Provider<LocationProvider>((ref) {
 });
 
 final remoteStoreProvider = Provider<RemoteStore>((ref) {
-  throw UnimplementedError();
+  final user = ref.watch(sessionProfileProvider);
+  if (FirebaseBootstrap.available &&
+      user != null &&
+      user.provider != AuthProviderType.local) {
+    return FirestoreRemoteStore(user.id);
+  }
+  return MemoryRemoteStore();
 });
 
 final userIdProvider = Provider<String>((ref) {
@@ -140,6 +147,7 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   return SyncEngine(
     db: ref.watch(databaseProvider),
     userId: ref.watch(userIdProvider),
+    ownerEmail: ref.watch(sessionProfileProvider)?.email,
     remote: ref.watch(remoteStoreProvider),
   );
 });

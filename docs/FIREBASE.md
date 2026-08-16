@@ -13,4 +13,12 @@ SpendPing runs fully offline without Firebase. Add Firebase when you want Google
 
 Until those files exist, `FirebaseBootstrap.tryInit()` fails closed. Google Sign-In on Android still opens the account picker and stores the Google profile on this device.
 
+## Where login and spends live
+
+- **This phone:** Google email, name, and account id are in secure storage (`spendping.email`, `spendping.userId`). Spends live in SQLite (`spendping.sqlite`) keyed by that account id.
+- **Cloud (needed to change phones):** Firestore `users/{uid}` holds the email; `users/{uid}/expenses` (and places, people, ledger, categories) hold the data. `emailLookups/{email}` points at the same `uid`.
+- Spends are **not** stored under the email string as a database key (emails can change). They stay under the Google/Firebase uid, with the email saved on every synced row as `ownerEmail`.
+
+On a new phone: sign in with the **same Google account** → same uid → sync pulls spends. This only works after Firebase is configured and Firestore rules from this folder are deployed.
+
 Do not commit admin SDK keys or service-account JSON.

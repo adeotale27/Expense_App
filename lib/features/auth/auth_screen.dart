@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../domain/entities/entities.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -33,6 +34,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+  }
+
+  Future<void> _signedIn(UserProfile user) async {
+    ref.read(sessionProfileProvider.notifier).state = user;
+    try {
+      await ref.read(syncEngineProvider).syncAll();
+    } catch (_) {}
   }
 
   String _friendly(Object e) {
@@ -69,7 +77,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ? null
                   : () => _run(() async {
                         final user = await auth.signInApple();
-                        ref.read(sessionProfileProvider.notifier).state = user;
+                        await _signedIn(user);
                       }),
               child: const Text('Sign in with Apple'),
             ),
@@ -80,7 +88,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ? null
                 : () => _run(() async {
                       final user = await auth.signInGoogle();
-                      ref.read(sessionProfileProvider.notifier).state = user;
+                      await _signedIn(user);
                     }),
             child: const Text('Continue with Google'),
           ),
@@ -113,7 +121,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               name.text.trim().isEmpty ? 'You' : name.text.trim(),
                             )
                           : await auth.signInEmail(email.text.trim(), password.text);
-                      ref.read(sessionProfileProvider.notifier).state = user;
+                      await _signedIn(user);
                     }),
             child: Text(register ? 'Create email account' : 'Sign in with email'),
           ),
