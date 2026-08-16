@@ -7,13 +7,13 @@ struct SpendPingQuickAddWidget: Widget {
         StaticConfiguration(kind: "SpendPingQuickAdd", provider: QuickAddProvider()) { _ in
             VStack(alignment: .leading, spacing: 10) {
                 Text("TODAY").font(.caption.weight(.bold))
-                Text("Type amount, then save").font(.caption2)
+                Text("Add spend").font(.title3.weight(.bold))
                 Link("Add spend", destination: URL(string: "spendping://compose")!)
             }
             .padding()
         }
         .configurationDisplayName("SpendPing Quick Add")
-        .description("Opens a box to type amount, Food or Fuel, then Save.")
+        .description("Opens amount + Save on iOS. Android saves from the widget sheet without opening the app.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }

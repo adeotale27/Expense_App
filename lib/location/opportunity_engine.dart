@@ -78,7 +78,11 @@ class OpportunityEngine {
     if (minutes >= 2 && minutes <= 15 && visit.cameFromHome && visit.returnedHome) {
       score += w.veryShortTrip;
     }
-    if (visit.place.type == PlaceType.home) score += w.knownHome;
+    if (visit.place.type.isCommercial &&
+        visit.duration.inSeconds >= 90 &&
+        !visit.passThrough) {
+      score += 10;
+    }
     if (visit.place.type == PlaceType.work) score += w.knownOffice;
     if (ctx.recentPromptAtPlace) score += w.recentPromptSameLocation;
     if (ctx.dismissedRecently) score += w.userDismissedSameLocation;

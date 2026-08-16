@@ -22,6 +22,10 @@ class _SpendPingAppState extends ConsumerState<SpendPingApp> {
         ref.read(pendingLaunchUriProvider.notifier).state = call.arguments as String;
       }
     });
+    listenForWidgetSpends(ref);
+    Future<void>.microtask(() async {
+      await importWidgetInbox(ref);
+    });
   }
 
   @override

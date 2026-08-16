@@ -504,7 +504,7 @@ class AppSettings extends Equatable {
     this.askAfterLeaving = true,
     this.askAfterReturningHome = true,
     this.eveningReview = true,
-    this.maxDailyPrompts = 3,
+    this.maxDailyPrompts = 8,
     this.themeMode = 'system',
     this.onboardingComplete = false,
     this.homePlaceId,
@@ -516,7 +516,7 @@ class AppSettings extends Equatable {
     this.expensePrompts = true,
     this.quietHoursStart = 22,
     this.quietHoursEnd = 7,
-    this.placeCooldownHours = 18,
+    this.placeCooldownHours = 4,
     this.lastCategoryId,
     this.lastPaymentMethod = PaymentMethod.upi,
     this.scoring = const ScoringConfig(),
@@ -705,11 +705,13 @@ class GeofenceEvent {
     required this.place,
     required this.entered,
     required this.at,
+    this.dwell = Duration.zero,
   });
 
   final Place place;
   final bool entered;
   final DateTime at;
+  final Duration dwell;
 }
 
 class VisitEvent {

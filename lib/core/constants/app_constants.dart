@@ -2,7 +2,7 @@ class AppConstants {
   static const appName = 'SpendPing';
   static const defaultCurrency = 'INR';
   static const pageSize = 50;
-  static const maxDailyPromptsDefault = 3;
+  static const maxDailyPromptsDefault = 8;
   static const minStopMinutesDefault = 3;
   static const rawLocationRetentionHours = 24;
   static const opportunityExpiryHours = 36;

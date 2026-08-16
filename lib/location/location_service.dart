@@ -155,6 +155,22 @@ class LocationRuntime {
     if (visit != null) {
       AppLog.location('Visit ended ${visit.place.name} ${visit.duration}');
       await _handleVisit(visit, settings);
+    } else if (fence != null &&
+        !fence.entered &&
+        fence.dwell.inSeconds >= 90 &&
+        fence.place.type != PlaceType.home &&
+        fence.place.type != PlaceType.work) {
+      await _handleVisit(
+        VisitEvent(
+          place: fence.place,
+          startedAt: fence.at.subtract(fence.dwell),
+          endedAt: fence.at,
+          duration: fence.dwell,
+          passThrough: false,
+          locationConfidence: 0.8,
+        ),
+        settings,
+      );
     }
     _pulseUi();
   }

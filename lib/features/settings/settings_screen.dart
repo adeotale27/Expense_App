@@ -86,6 +86,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             SwitchListTile(
               title: const Text('Ask after leaving a place'),
+              subtitle: const Text('Notification as soon as you leave, not hours later.'),
               value: s.askAfterLeaving,
               onChanged: (v) =>
                   ref.read(settingsRepoProvider).save(s.copyWith(askAfterLeaving: v)),

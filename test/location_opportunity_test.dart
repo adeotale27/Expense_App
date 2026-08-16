@@ -66,6 +66,19 @@ void main() {
     expect(decision.score, greaterThanOrEqualTo(60));
   });
 
+  test('leaving a shop without going home still asks', () {
+    final visit = run([
+      ('home', Duration.zero),
+      ('grocery', const Duration(minutes: 1)),
+      ('grocery', const Duration(minutes: 8)),
+      ('restaurant', const Duration(minutes: 9)),
+    ]);
+    expect(visit, isNotNull);
+    expect(visit!.place.type, PlaceType.grocery);
+    expect(visit.returnedHome, isFalse);
+    expect(opp.evaluate(visit, ctx()).create, isTrue);
+  });
+
   test('short milk trip still eligible', () {
     final visit = run([
       ('home', Duration.zero),

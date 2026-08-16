@@ -65,6 +65,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             'Your data belongs to your account, not this phone.',
             style: Theme.of(context).textTheme.titleMedium,
           ),
+          const SizedBox(height: 8),
+          Text(
+            defaultTargetPlatform == TargetPlatform.android
+                ? 'Google login works on a local debug install. You do not need to publish on Play. Add this computer’s SHA-1 in Firebase (see docs/PLAY_STORE.md).'
+                : 'Sign in with Apple on iPhone. Google works here too if you set it up.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           const SizedBox(height: 24),
           if (error != null)
             Padding(

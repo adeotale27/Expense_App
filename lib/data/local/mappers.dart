@@ -240,7 +240,7 @@ AppSettings settingsFromJson(String userId, String json) {
     askAfterLeaving: map['askAfterLeaving'] as bool? ?? true,
     askAfterReturningHome: map['askAfterReturningHome'] as bool? ?? true,
     eveningReview: map['eveningReview'] as bool? ?? true,
-    maxDailyPrompts: map['maxDailyPrompts'] as int? ?? 3,
+    maxDailyPrompts: map['maxDailyPrompts'] as int? ?? 8,
     themeMode: map['themeMode'] as String? ?? 'system',
     onboardingComplete: map['onboardingComplete'] as bool? ?? false,
     homePlaceId: map['homePlaceId'] as String?,
@@ -252,7 +252,7 @@ AppSettings settingsFromJson(String userId, String json) {
     expensePrompts: map['expensePrompts'] as bool? ?? true,
     quietHoursStart: map['quietHoursStart'] as int? ?? 22,
     quietHoursEnd: map['quietHoursEnd'] as int? ?? 7,
-    placeCooldownHours: map['placeCooldownHours'] as int? ?? 18,
+    placeCooldownHours: map['placeCooldownHours'] as int? ?? 4,
     lastCategoryId: map['lastCategoryId'] as String?,
     lastPaymentMethod: _payment(map['lastPaymentMethod'] as String? ?? 'upi'),
     scoring: ScoringConfig(

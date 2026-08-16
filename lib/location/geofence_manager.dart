@@ -6,6 +6,7 @@ import '../data/repositories/drift_repositories.dart';
 /// user-confirmed geofenced places. Does not poll GPS on its own.
 class GeofenceManager {
   final Map<String, bool> _inside = {};
+  final Map<String, DateTime> _enteredAt = {};
 
   GeofenceEvent? observe({
     required GeoFix fix,
@@ -22,9 +23,17 @@ class GeofenceManager {
       final nowInside = d <= place.radius;
       final wasInside = _inside[place.id] ?? false;
       if (nowInside && !wasInside) {
+        _enteredAt[place.id] = fix.timestamp;
         event = GeofenceEvent(place: place, entered: true, at: fix.timestamp);
       } else if (!nowInside && wasInside) {
-        event = GeofenceEvent(place: place, entered: false, at: fix.timestamp);
+        final start = _enteredAt.remove(place.id);
+        final dwell = start == null ? Duration.zero : fix.timestamp.difference(start);
+        event = GeofenceEvent(
+          place: place,
+          entered: false,
+          at: fix.timestamp,
+          dwell: dwell,
+        );
       }
       _inside[place.id] = nowInside;
     }
