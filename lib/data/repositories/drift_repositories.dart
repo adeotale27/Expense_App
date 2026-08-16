@@ -378,6 +378,15 @@ class DriftLedgerRepository implements LedgerRepository {
   }
 
   @override
+  Stream<List<LedgerEntry>> watchAll() {
+    return (db.select(db.ledgerEntries)
+          ..where((t) => t.userId.equals(userId) & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.date)]))
+        .watch()
+        .map((rows) => rows.map(ledgerFromRow).toList());
+  }
+
+  @override
   Future<List<LedgerEntry>> all() async {
     final rows = await (db.select(db.ledgerEntries)
           ..where((t) => t.userId.equals(userId) & t.deletedAt.isNull()))

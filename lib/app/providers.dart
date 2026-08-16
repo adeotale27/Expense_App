@@ -113,6 +113,10 @@ final peopleProvider = StreamProvider<List<Person>>((ref) {
   return ref.watch(personRepoProvider).watchAll();
 });
 
+final ledgerEntriesProvider = StreamProvider<List<LedgerEntry>>((ref) {
+  return ref.watch(ledgerRepoProvider).watchAll();
+});
+
 final pendingOpportunitiesProvider = StreamProvider<List<ExpenseOpportunity>>((ref) {
   return ref.watch(opportunityRepoProvider).watchPending();
 });

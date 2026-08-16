@@ -23,21 +23,40 @@ class PlacesScreen extends ConsumerWidget {
               subtitle:
                   'Places are remembered when you stay somewhere meaningful. Nothing is logged as an expense until you confirm.',
             )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 108),
               itemCount: places.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
                 final p = places[i];
-                return ListTile(
-                  leading: Text(_emoji(p.type), style: const TextStyle(fontSize: 22)),
-                  title: Text(p.name),
-                  subtitle: Text('${p.type.label} · ${p.visitCount} visits'),
-                  trailing: Text(
-                    Money(minorUnits: p.totalSpendMinor).format(),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
+                return QuietCard(
                   onTap: () => context.push('/places/${p.id}'),
-                  onLongPress: () => _placeActions(context, ref, p),
+                  child: GestureDetector(
+                    onLongPress: () => _placeActions(context, ref, p),
+                    child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
+                        child: Text(_emoji(p.type), style: const TextStyle(fontSize: 22)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(p.name, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                            Text('${p.type.label} · ${p.visitCount} visits'),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        Money(minorUnits: p.totalSpendMinor).format(),
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                  ),
                 );
               },
             ),
@@ -103,11 +122,23 @@ class PlaceDetailScreen extends ConsumerWidget {
             ],
           ),
           body: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
-              Text('${p.visitCount} visits', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              Text('Total: ${Money(minorUnits: p.totalSpendMinor).format()}'),
+              GradientHero(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${_emoji(p.type)} ${p.type.label}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Text(
+                      Money(minorUnits: p.totalSpendMinor).format(),
+                      style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800),
+                    ),
+                    Text('${p.visitCount} visits · nothing auto-logged'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               Text('Average: ${Money(minorUnits: p.averageSpendMinor).format()}'),
               if (p.lastVisitedAt != null) Text('Last visit: ${p.lastVisitedAt!.toLocal()}'),
               const SizedBox(height: 16),

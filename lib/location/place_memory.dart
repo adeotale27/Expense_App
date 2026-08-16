@@ -5,16 +5,20 @@ import '../domain/enums/enums.dart';
 import '../domain/repositories/repositories.dart';
 import 'location_provider.dart';
 import 'place_classifier.dart';
+import 'reverse_geocode.dart';
 
-/// Remembers meaningful stops as local places without reverse-geocoding.
+/// Remembers meaningful stops as local places.
+/// Reverse-geocoding is a name hint only — never an automatic expense.
 class PlaceMemory {
   PlaceMemory({
     required this.places,
     required this.classifier,
-  });
+    ReverseGeocode? geocode,
+  }) : geocode = geocode ?? ReverseGeocode(classifier: classifier);
 
   final PlaceRepository places;
   final PlaceClassifier classifier;
+  final ReverseGeocode geocode;
 
   GeoFix? _unknownStart;
 
@@ -56,11 +60,15 @@ class PlaceMemory {
     final dwell = fix.timestamp.difference(_unknownStart!.timestamp);
     if (dwell.inMinutes < minStopMinutes) return null;
 
+    final hint = await geocode.nameFor(
+      latitude: _unknownStart!.latitude,
+      longitude: _unknownStart!.longitude,
+    );
     final place = Place(
       id: newId(),
       userId: userId,
-      name: _untitledName(fix),
-      type: PlaceType.unknown,
+      name: hint.$1,
+      type: hint.$2,
       latitude: _unknownStart!.latitude,
       longitude: _unknownStart!.longitude,
       radius: 150,
@@ -90,11 +98,5 @@ class PlaceMemory {
           ),
         )
         .then((_) async => (await places.getById(place.id)) ?? place);
-  }
-
-  String _untitledName(GeoFix fix) {
-    final lat = fix.latitude.toStringAsFixed(3);
-    final lng = fix.longitude.toStringAsFixed(3);
-    return 'Place near $lat, $lng';
   }
 }

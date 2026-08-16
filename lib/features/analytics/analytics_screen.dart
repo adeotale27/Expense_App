@@ -37,10 +37,12 @@ class AnalyticsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          QuietCard(
+          GradientHero(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('THIS MONTH', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 1.1)),
+                const SizedBox(height: 8),
                 MoneyText(Money(minorUnits: total), large: true),
                 Text('Average per day: ${Money(minorUnits: total ~/ days).format()}'),
               ],
