@@ -12,6 +12,11 @@ class SpendPingApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final user = ref.watch(sessionProfileProvider);
+    ref.listen<String?>(pendingRouteProvider, (prev, next) {
+      if (next == null || next.isEmpty) return;
+      router.go(next);
+      ref.read(pendingRouteProvider.notifier).state = null;
+    });
     var themeMode = ThemeMode.system;
     if (user != null) {
       themeMode = ref.watch(settingsProvider).maybeWhen(

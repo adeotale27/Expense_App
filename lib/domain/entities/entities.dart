@@ -28,6 +28,7 @@ class Category extends Equatable {
     required this.userId,
     required this.name,
     required this.icon,
+    this.accentColor = 0xFF6D5EF7,
     required this.isDefault,
     required this.isActive,
     required this.sortOrder,
@@ -43,6 +44,7 @@ class Category extends Equatable {
   final String userId;
   final String name;
   final String icon;
+  final int accentColor;
   final bool isDefault;
   final bool isActive;
   final int sortOrder;
@@ -56,6 +58,7 @@ class Category extends Equatable {
   Category copyWith({
     String? name,
     String? icon,
+    int? accentColor,
     bool? isActive,
     int? sortOrder,
     DateTime? updatedAt,
@@ -68,6 +71,7 @@ class Category extends Equatable {
       userId: userId,
       name: name ?? this.name,
       icon: icon ?? this.icon,
+      accentColor: accentColor ?? this.accentColor,
       isDefault: isDefault,
       isActive: isActive ?? this.isActive,
       sortOrder: sortOrder ?? this.sortOrder,
@@ -172,10 +176,15 @@ class Place extends Equatable {
     required this.type,
     required this.latitude,
     required this.longitude,
-    this.radius = 80,
+    this.radius = 150,
     this.visitCount = 0,
     this.totalSpendMinor = 0,
     this.lastVisitedAt,
+    this.firstVisitedAt,
+    this.confidence = 0,
+    this.userConfirmedName = false,
+    this.geofenceEnabled = false,
+    this.forgotten = false,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -194,6 +203,11 @@ class Place extends Equatable {
   final int visitCount;
   final int totalSpendMinor;
   final DateTime? lastVisitedAt;
+  final DateTime? firstVisitedAt;
+  final int confidence;
+  final bool userConfirmedName;
+  final bool geofenceEnabled;
+  final bool forgotten;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -207,9 +221,15 @@ class Place extends Equatable {
   Place copyWith({
     String? name,
     PlaceType? type,
+    double? radius,
     int? visitCount,
     int? totalSpendMinor,
     DateTime? lastVisitedAt,
+    DateTime? firstVisitedAt,
+    int? confidence,
+    bool? userConfirmedName,
+    bool? geofenceEnabled,
+    bool? forgotten,
     DateTime? updatedAt,
     DateTime? deletedAt,
     SyncStatus? syncStatus,
@@ -222,10 +242,15 @@ class Place extends Equatable {
       type: type ?? this.type,
       latitude: latitude,
       longitude: longitude,
-      radius: radius,
+      radius: radius ?? this.radius,
       visitCount: visitCount ?? this.visitCount,
       totalSpendMinor: totalSpendMinor ?? this.totalSpendMinor,
       lastVisitedAt: lastVisitedAt ?? this.lastVisitedAt,
+      firstVisitedAt: firstVisitedAt ?? this.firstVisitedAt,
+      confidence: confidence ?? this.confidence,
+      userConfirmedName: userConfirmedName ?? this.userConfirmedName,
+      geofenceEnabled: geofenceEnabled ?? this.geofenceEnabled,
+      forgotten: forgotten ?? this.forgotten,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt,
@@ -246,6 +271,8 @@ class Person extends Equatable {
     required this.name,
     this.phone,
     this.note,
+    this.photoPath,
+    this.archived = false,
     required this.createdAt,
     required this.updatedAt,
     this.deletedAt,
@@ -259,6 +286,8 @@ class Person extends Equatable {
   final String name;
   final String? phone;
   final String? note;
+  final String? photoPath;
+  final bool archived;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -266,8 +295,36 @@ class Person extends Equatable {
   final String deviceId;
   final int version;
 
+  Person copyWith({
+    String? name,
+    String? phone,
+    String? note,
+    String? photoPath,
+    bool? archived,
+    DateTime? updatedAt,
+    DateTime? deletedAt,
+    SyncStatus? syncStatus,
+    int? version,
+  }) {
+    return Person(
+      id: id,
+      userId: userId,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      note: note ?? this.note,
+      photoPath: photoPath ?? this.photoPath,
+      archived: archived ?? this.archived,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      deviceId: deviceId,
+      version: version ?? this.version,
+    );
+  }
+
   @override
-  List<Object?> get props => [id, name];
+  List<Object?> get props => [id, name, archived];
 }
 
 class LedgerEntry extends Equatable {
@@ -451,6 +508,17 @@ class AppSettings extends Equatable {
     this.themeMode = 'system',
     this.onboardingComplete = false,
     this.homePlaceId,
+    this.workPlaceId,
+    this.backgroundLocation = true,
+    this.smartPlaceDetection = true,
+    this.homeDetection = true,
+    this.workDetection = true,
+    this.expensePrompts = true,
+    this.quietHoursStart = 22,
+    this.quietHoursEnd = 7,
+    this.placeCooldownHours = 18,
+    this.lastCategoryId,
+    this.lastPaymentMethod = PaymentMethod.upi,
     this.scoring = const ScoringConfig(),
   });
 
@@ -465,6 +533,17 @@ class AppSettings extends Equatable {
   final String themeMode;
   final bool onboardingComplete;
   final String? homePlaceId;
+  final String? workPlaceId;
+  final bool backgroundLocation;
+  final bool smartPlaceDetection;
+  final bool homeDetection;
+  final bool workDetection;
+  final bool expensePrompts;
+  final int quietHoursStart;
+  final int quietHoursEnd;
+  final int placeCooldownHours;
+  final String? lastCategoryId;
+  final PaymentMethod lastPaymentMethod;
   final ScoringConfig scoring;
 
   AppSettings copyWith({
@@ -478,6 +557,17 @@ class AppSettings extends Equatable {
     String? themeMode,
     bool? onboardingComplete,
     String? homePlaceId,
+    String? workPlaceId,
+    bool? backgroundLocation,
+    bool? smartPlaceDetection,
+    bool? homeDetection,
+    bool? workDetection,
+    bool? expensePrompts,
+    int? quietHoursStart,
+    int? quietHoursEnd,
+    int? placeCooldownHours,
+    String? lastCategoryId,
+    PaymentMethod? lastPaymentMethod,
     ScoringConfig? scoring,
   }) {
     return AppSettings(
@@ -493,6 +583,17 @@ class AppSettings extends Equatable {
       themeMode: themeMode ?? this.themeMode,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
       homePlaceId: homePlaceId ?? this.homePlaceId,
+      workPlaceId: workPlaceId ?? this.workPlaceId,
+      backgroundLocation: backgroundLocation ?? this.backgroundLocation,
+      smartPlaceDetection: smartPlaceDetection ?? this.smartPlaceDetection,
+      homeDetection: homeDetection ?? this.homeDetection,
+      workDetection: workDetection ?? this.workDetection,
+      expensePrompts: expensePrompts ?? this.expensePrompts,
+      quietHoursStart: quietHoursStart ?? this.quietHoursStart,
+      quietHoursEnd: quietHoursEnd ?? this.quietHoursEnd,
+      placeCooldownHours: placeCooldownHours ?? this.placeCooldownHours,
+      lastCategoryId: lastCategoryId ?? this.lastCategoryId,
+      lastPaymentMethod: lastPaymentMethod ?? this.lastPaymentMethod,
       scoring: scoring ?? this.scoring,
     );
   }
@@ -517,6 +618,98 @@ class ScoringConfig extends Equatable {
 
   @override
   List<Object?> get props => [weights, ignoreBelow, lowBelow, possibleBelow];
+}
+
+class VisitLog {
+  const VisitLog({
+    required this.id,
+    required this.userId,
+    required this.placeId,
+    required this.startedAt,
+    required this.endedAt,
+    required this.durationSeconds,
+    required this.hourOfDay,
+    required this.weekday,
+    this.passThrough = false,
+  });
+
+  final String id;
+  final String userId;
+  final String placeId;
+  final DateTime startedAt;
+  final DateTime endedAt;
+  final int durationSeconds;
+  final int hourOfDay;
+  final int weekday;
+  final bool passThrough;
+}
+
+class PromptEvent {
+  const PromptEvent({
+    required this.id,
+    required this.userId,
+    required this.kind,
+    this.placeId,
+    required this.createdAt,
+    this.response,
+  });
+
+  final String id;
+  final String userId;
+  final PromptKind kind;
+  final String? placeId;
+  final DateTime createdAt;
+  final String? response;
+}
+
+class PlaceSuggestion {
+  const PlaceSuggestion({
+    required this.place,
+    required this.kind,
+    required this.confidence,
+    required this.headline,
+    required this.body,
+  });
+
+  final Place place;
+  final PromptKind kind;
+  final int confidence;
+  final String headline;
+  final String body;
+}
+
+class SpendingHabits {
+  const SpendingHabits({
+    this.frequentCategoryId,
+    this.recentCategoryId,
+    this.frequentPayment = PaymentMethod.upi,
+    this.recentPayment = PaymentMethod.upi,
+    this.frequentPlaceIds = const [],
+    this.groceryLike = false,
+    this.hangoutPlaceIds = const [],
+    this.typicalQuickAmounts = const [10000, 20000, 50000],
+  });
+
+  final String? frequentCategoryId;
+  final String? recentCategoryId;
+  final PaymentMethod frequentPayment;
+  final PaymentMethod recentPayment;
+  final List<String> frequentPlaceIds;
+  final bool groceryLike;
+  final List<String> hangoutPlaceIds;
+  final List<int> typicalQuickAmounts;
+}
+
+class GeofenceEvent {
+  const GeofenceEvent({
+    required this.place,
+    required this.entered,
+    required this.at,
+  });
+
+  final Place place;
+  final bool entered;
+  final DateTime at;
 }
 
 class VisitEvent {

@@ -10,6 +10,7 @@ import '../../domain/repositories/repositories.dart';
 import '../local/app_database.dart';
 import '../local/mappers.dart';
 import '../local/seeds.dart';
+import 'intel_store.dart';
 
 class DriftExpenseRepository implements ExpenseRepository {
   DriftExpenseRepository(this.db, this.userId);
@@ -148,6 +149,8 @@ class DriftCategoryRepository implements CategoryRepository {
   final String userId;
   final String deviceId;
 
+  DriftIntelRepository get _intel => DriftIntelRepository(db, userId);
+
   Future<void> ensureDefaults() async {
     final existing = await (db.select(db.categories)
           ..where((t) => t.userId.equals(userId)))
@@ -155,7 +158,16 @@ class DriftCategoryRepository implements CategoryRepository {
     if (existing.isNotEmpty) return;
     for (final c in buildDefaultCategories(userId: userId, deviceId: deviceId)) {
       await db.into(db.categories).insert(categoryToRow(c));
+      await _intel.saveCategoryColor(c.id, c.accentColor);
     }
+  }
+
+  Future<List<Category>> _withColors(List<Category> list) async {
+    final colors = await _intel.loadCategoryColors();
+    return [
+      for (final c in list)
+        colors.containsKey(c.id) ? c.copyWith(accentColor: colors[c.id]) : c,
+    ];
   }
 
   @override
@@ -167,7 +179,16 @@ class DriftCategoryRepository implements CategoryRepository {
               t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
         .watch()
-        .map((rows) => rows.map(categoryFromRow).toList());
+        .asyncMap((rows) => _withColors(rows.map(categoryFromRow).toList()));
+  }
+
+  @override
+  Stream<List<Category>> watchAll() {
+    return (db.select(db.categories)
+          ..where((t) => t.userId.equals(userId) & t.deletedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .watch()
+        .asyncMap((rows) => _withColors(rows.map(categoryFromRow).toList()));
   }
 
   @override
@@ -176,12 +197,13 @@ class DriftCategoryRepository implements CategoryRepository {
           ..where((t) => t.userId.equals(userId) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
         .get();
-    return rows.map(categoryFromRow).toList();
+    return _withColors(rows.map(categoryFromRow).toList());
   }
 
   @override
   Future<void> upsert(Category category) async {
     await db.into(db.categories).insertOnConflictUpdate(categoryToRow(category));
+    await _intel.saveCategoryColor(category.id, category.accentColor);
   }
 
   @override
@@ -192,7 +214,18 @@ class DriftCategoryRepository implements CategoryRepository {
               t.name.equals(name) &
               t.deletedAt.isNull()))
         .getSingleOrNull();
-    return row == null ? null : categoryFromRow(row);
+    if (row == null) return null;
+    final list = await _withColors([categoryFromRow(row)]);
+    return list.first;
+  }
+
+  @override
+  Future<Category?> getById(String id) async {
+    final row = await (db.select(db.categories)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    final list = await _withColors([categoryFromRow(row)]);
+    return list.first;
   }
 }
 
@@ -201,13 +234,29 @@ class DriftPlaceRepository implements PlaceRepository {
   final AppDatabase db;
   final String userId;
 
+  DriftIntelRepository get _intel => DriftIntelRepository(db, userId);
+
+  Future<List<Place>> _merge(List<Place> list) async {
+    final extras = await _intel.loadPlaceIntel();
+    return [for (final p in list) mergePlaceIntel(p, extras)];
+  }
+
+  Future<Place?> _mergeOne(Place? place) async {
+    if (place == null) return null;
+    final extras = await _intel.loadPlaceIntel();
+    return mergePlaceIntel(place, extras);
+  }
+
   @override
   Stream<List<Place>> watchAll() {
     return (db.select(db.places)
           ..where((t) => t.userId.equals(userId) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm.desc(t.totalSpendMinor)]))
         .watch()
-        .map((rows) => rows.map(placeFromRow).toList());
+        .asyncMap((rows) async {
+      final merged = await _merge(rows.map(placeFromRow).toList());
+      return merged.where((p) => !p.forgotten).toList();
+    });
   }
 
   @override
@@ -215,18 +264,19 @@ class DriftPlaceRepository implements PlaceRepository {
     final rows = await (db.select(db.places)
           ..where((t) => t.userId.equals(userId) & t.deletedAt.isNull()))
         .get();
-    return rows.map(placeFromRow).toList();
+    final merged = await _merge(rows.map(placeFromRow).toList());
+    return merged.where((p) => !p.forgotten).toList();
   }
 
   @override
   Future<Place?> getById(String id) async {
     final row =
         await (db.select(db.places)..where((t) => t.id.equals(id))).getSingleOrNull();
-    return row == null ? null : placeFromRow(row);
+    return _mergeOne(row == null ? null : placeFromRow(row));
   }
 
   @override
-  Future<Place?> findNearby(double lat, double lng, {double maxMeters = 80}) async {
+  Future<Place?> findNearby(double lat, double lng, {double maxMeters = 150}) async {
     final allPlaces = await all();
     Place? best;
     var bestD = maxMeters;
@@ -243,6 +293,14 @@ class DriftPlaceRepository implements PlaceRepository {
   @override
   Future<void> upsert(Place place) async {
     await db.into(db.places).insertOnConflictUpdate(placeToRow(place));
+    await _intel.savePlaceIntel(place);
+  }
+
+  @override
+  Future<void> forget(String id, DateTime at) async {
+    final existing = await getById(id);
+    if (existing == null) return;
+    await upsert(existing.copyWith(forgotten: true, geofenceEnabled: false, updatedAt: at));
   }
 }
 
@@ -251,25 +309,43 @@ class DriftPersonRepository implements PersonRepository {
   final AppDatabase db;
   final String userId;
 
+  DriftIntelRepository get _intel => DriftIntelRepository(db, userId);
+
+  Future<List<Person>> _merge(List<Person> list) async {
+    final extras = await _intel.loadPeopleIntel();
+    return [
+      for (final p in list)
+        extras.containsKey(p.id)
+            ? p.copyWith(archived: extras[p.id]!.$1, photoPath: extras[p.id]!.$2)
+            : p,
+    ];
+  }
+
   @override
   Stream<List<Person>> watchAll() {
     return (db.select(db.people)
           ..where((t) => t.userId.equals(userId) & t.deletedAt.isNull())
           ..orderBy([(t) => OrderingTerm.asc(t.name)]))
         .watch()
-        .map((rows) => rows.map(personFromRow).toList());
+        .asyncMap((rows) async {
+      final merged = await _merge(rows.map(personFromRow).toList());
+      return merged.where((p) => !p.archived).toList();
+    });
   }
 
   @override
   Future<Person?> getById(String id) async {
     final row =
         await (db.select(db.people)..where((t) => t.id.equals(id))).getSingleOrNull();
-    return row == null ? null : personFromRow(row);
+    if (row == null) return null;
+    final merged = await _merge([personFromRow(row)]);
+    return merged.first;
   }
 
   @override
   Future<void> upsert(Person person) async {
     await db.into(db.people).insertOnConflictUpdate(personToRow(person));
+    await _intel.savePersonIntel(person);
   }
 
   @override

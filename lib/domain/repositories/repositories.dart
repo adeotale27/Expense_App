@@ -45,17 +45,33 @@ abstract class ExpenseRepository {
 
 abstract class CategoryRepository {
   Stream<List<Category>> watchActive();
+  Stream<List<Category>> watchAll();
   Future<List<Category>> all();
   Future<void> upsert(Category category);
   Future<Category?> byName(String name);
+  Future<Category?> getById(String id);
 }
 
 abstract class PlaceRepository {
   Stream<List<Place>> watchAll();
   Future<List<Place>> all();
   Future<Place?> getById(String id);
-  Future<Place?> findNearby(double lat, double lng, {double maxMeters = 80});
+  Future<Place?> findNearby(double lat, double lng, {double maxMeters = 150});
   Future<void> upsert(Place place);
+  Future<void> forget(String id, DateTime at);
+}
+
+abstract class IntelRepository {
+  Future<void> recordVisit(VisitLog log);
+  Future<List<VisitLog>> visitsFor(String placeId);
+  Future<List<VisitLog>> recentVisits({int limit = 200});
+  Future<void> recordPrompt(PromptEvent event);
+  Future<List<PromptEvent>> recentPrompts({int limit = 200});
+  Future<int> promptsToday(DateTime nowUtc);
+  Future<PromptEvent?> lastPrompt({
+    required PromptKind kind,
+    String? placeId,
+  });
 }
 
 abstract class PersonRepository {

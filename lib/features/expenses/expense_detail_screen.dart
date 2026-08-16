@@ -8,6 +8,7 @@ import '../../core/utils/dates.dart';
 import '../../core/utils/ids.dart';
 import '../../domain/entities/entities.dart';
 import '../../domain/enums/enums.dart';
+import 'add_expense_screen.dart';
 
 class ExpenseDetailScreen extends ConsumerWidget {
   const ExpenseDetailScreen({super.key, required this.id});
@@ -23,13 +24,18 @@ class ExpenseDetailScreen extends ConsumerWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         final cats = ref.watch(categoriesProvider).valueOrNull ?? [];
-        final cat = cats.where((c) => c.id == e.categoryId).firstOrNull;
+        final allCats = ref.watch(allCategoriesProvider).valueOrNull ?? cats;
+        final cat = allCats.where((c) => c.id == e.categoryId).firstOrNull ??
+            cats.where((c) => c.id == e.categoryId).firstOrNull;
+        final places = ref.watch(placesProvider).valueOrNull ?? [];
+        final place = places.where((p) => p.id == e.placeId).firstOrNull;
         return Scaffold(
           appBar: AppBar(
             title: const Text('Expense'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.copy),
+                tooltip: 'Duplicate',
                 onPressed: () async {
                   final now = DateTime.now().toUtc();
                   await ref.read(expenseRepoProvider).upsert(
@@ -58,6 +64,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete',
                 onPressed: () async {
                   await ref.read(expenseRepoProvider).softDelete(e.id, DateTime.now().toUtc());
                   if (context.mounted) context.pop();
@@ -65,27 +72,43 @@ class ExpenseDetailScreen extends ConsumerWidget {
               ),
             ],
           ),
-          body: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text(e.amount.format(),
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      )),
-              const SizedBox(height: 8),
-              Text('${cat?.icon ?? ''} ${cat?.name ?? ''}'.trim(),
-                  style: Theme.of(context).textTheme.titleLarge),
-              if (e.merchantName != null) Text(e.merchantName!),
-              const SizedBox(height: 16),
-              Text(formatDay(e.timestamp.toLocal())),
-              Text(formatTime(e.timestamp.toLocal())),
-              const SizedBox(height: 16),
-              Text('Payment: ${e.paymentMethod.label}'),
-              if (e.note != null) ...[
-                const SizedBox(height: 12),
-                Text('Note: ${e.note}'),
-              ],
-            ],
+          body: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.amount.format(),
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${cat?.icon ?? ''} ${cat?.name ?? ''}'.trim(),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  Text('${e.paymentMethod.label}${place == null ? '' : ' · ${place.name}'}'),
+                  Text('${formatDay(e.timestamp.toLocal())} · ${formatTime(e.timestamp.toLocal())}'),
+                  if (e.note != null) ...[
+                    const SizedBox(height: 12),
+                    Text('Note: ${e.note}'),
+                  ],
+                  const Spacer(),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AddExpenseScreen(expense: e),
+                        ),
+                      );
+                    },
+                    child: const Text('Edit'),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },

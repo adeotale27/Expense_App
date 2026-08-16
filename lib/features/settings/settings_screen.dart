@@ -124,6 +124,57 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               },
             ),
             const Divider(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text(
+                'Location Intelligence',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            SwitchListTile(
+              title: const Text('Background location'),
+              subtitle: const Text('Uses the OS location stream (~150m) to notice visits. Stays on this device.'),
+              value: s.backgroundLocation,
+              onChanged: (v) =>
+                  ref.read(settingsRepoProvider).save(s.copyWith(backgroundLocation: v)),
+            ),
+            SwitchListTile(
+              title: const Text('Smart place detection'),
+              subtitle: const Text('Remembers meaningful stops locally. Never creates expenses by itself.'),
+              value: s.smartPlaceDetection,
+              onChanged: (v) =>
+                  ref.read(settingsRepoProvider).save(s.copyWith(smartPlaceDetection: v)),
+            ),
+            SwitchListTile(
+              title: const Text('Home detection'),
+              subtitle: const Text('May ask once if a frequent evening place looks like home.'),
+              value: s.homeDetection,
+              onChanged: (v) =>
+                  ref.read(settingsRepoProvider).save(s.copyWith(homeDetection: v)),
+            ),
+            SwitchListTile(
+              title: const Text('Work detection'),
+              subtitle: const Text('May ask once if a weekday daytime place looks like work.'),
+              value: s.workDetection,
+              onChanged: (v) =>
+                  ref.read(settingsRepoProvider).save(s.copyWith(workDetection: v)),
+            ),
+            SwitchListTile(
+              title: const Text('Expense prompts'),
+              subtitle: const Text('Asks “Did you spend anything here?” after meaningful visits.'),
+              value: s.expensePrompts,
+              onChanged: (v) =>
+                  ref.read(settingsRepoProvider).save(s.copyWith(expensePrompts: v)),
+            ),
+            ListTile(
+              title: const Text('Quiet hours'),
+              subtitle: Text('${s.quietHoursStart}:00 – ${s.quietHoursEnd}:00'),
+              onTap: () async {
+                final nextStart = s.quietHoursStart == 22 ? 23 : 22;
+                await ref.read(settingsRepoProvider).save(s.copyWith(quietHoursStart: nextStart));
+              },
+            ),
+            const Divider(),
             ListTile(
               title: const Text('Enable location'),
               subtitle: const Text(

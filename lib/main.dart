@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
@@ -10,6 +11,8 @@ import 'data/remote/auth_service.dart';
 import 'data/sync/sync_engine.dart';
 import 'location/location_provider.dart';
 import 'notifications/notification_service.dart';
+
+const _launchChannel = MethodChannel('spendping/launch');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,25 +29,46 @@ Future<void> main() async {
       ? IOSLocationProvider()
       : AndroidLocationProvider();
 
-  // Simulator is always available; production location uses the OS provider.
-  // Developer tools emit into [simulator] which is merged below.
   final merged = _MergedLocationProvider(platform: location, simulator: simulator);
 
   final remote = FirebaseBootstrap.available && user != null
       ? FirestoreRemoteStore(user.id)
       : MemoryRemoteStore();
 
+  final container = ProviderContainer(
+    overrides: [
+      databaseProvider.overrideWithValue(db),
+      deviceIdProvider.overrideWithValue(deviceId),
+      sessionProfileProvider.overrideWith((ref) => user),
+      notificationServiceProvider.overrideWithValue(notifications),
+      simulatorProvider.overrideWithValue(simulator),
+      locationProviderAdapter.overrideWithValue(merged),
+      remoteStoreProvider.overrideWithValue(remote),
+    ],
+  );
+
+  notifications.onAction = (payload, actionId) {
+    if (payload.startsWith('opp:')) {
+      container.read(pendingRouteProvider.notifier).state =
+          actionId == 'no' ? '/inbox' : '/add';
+    } else if (payload.startsWith('suggest:')) {
+      container.read(pendingRouteProvider.notifier).state = '/home';
+    }
+  };
+
+  try {
+    final launch = await _launchChannel.invokeMethod<String>('consumeLaunch');
+    if (launch != null && launch.contains('add')) {
+      final uri = Uri.tryParse(launch);
+      final amount = uri?.queryParameters['amount'];
+      container.read(pendingRouteProvider.notifier).state =
+          amount == null ? '/add' : '/add?amount=$amount';
+    }
+  } catch (_) {}
+
   runApp(
-    ProviderScope(
-      overrides: [
-        databaseProvider.overrideWithValue(db),
-        deviceIdProvider.overrideWithValue(deviceId),
-        sessionProfileProvider.overrideWith((ref) => user),
-        notificationServiceProvider.overrideWithValue(notifications),
-        simulatorProvider.overrideWithValue(simulator),
-        locationProviderAdapter.overrideWithValue(merged),
-        remoteStoreProvider.overrideWithValue(remote),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const SpendPingApp(),
     ),
   );

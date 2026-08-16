@@ -15,7 +15,7 @@ Expense expenseFromRow(ExpenseData row) => Expense(
       categoryId: row.categoryId,
       merchantName: row.merchantName,
       placeId: row.placeId,
-      paymentMethod: PaymentMethod.values.byName(row.paymentMethod),
+      paymentMethod: _payment(row.paymentMethod),
       note: row.note,
       timestamp: row.timestamp,
       source: ExpenseSource.values.byName(row.source),
@@ -244,6 +244,17 @@ AppSettings settingsFromJson(String userId, String json) {
     themeMode: map['themeMode'] as String? ?? 'system',
     onboardingComplete: map['onboardingComplete'] as bool? ?? false,
     homePlaceId: map['homePlaceId'] as String?,
+    workPlaceId: map['workPlaceId'] as String?,
+    backgroundLocation: map['backgroundLocation'] as bool? ?? true,
+    smartPlaceDetection: map['smartPlaceDetection'] as bool? ?? true,
+    homeDetection: map['homeDetection'] as bool? ?? true,
+    workDetection: map['workDetection'] as bool? ?? true,
+    expensePrompts: map['expensePrompts'] as bool? ?? true,
+    quietHoursStart: map['quietHoursStart'] as int? ?? 22,
+    quietHoursEnd: map['quietHoursEnd'] as int? ?? 7,
+    placeCooldownHours: map['placeCooldownHours'] as int? ?? 18,
+    lastCategoryId: map['lastCategoryId'] as String?,
+    lastPaymentMethod: _payment(map['lastPaymentMethod'] as String? ?? 'upi'),
     scoring: ScoringConfig(
       weights: (map['weights'] as Map?)?.map(
             (k, v) => MapEntry(k.toString(), (v as num).toInt()),
@@ -267,8 +278,26 @@ String settingsToJson(AppSettings s) => jsonEncode({
       'themeMode': s.themeMode,
       'onboardingComplete': s.onboardingComplete,
       'homePlaceId': s.homePlaceId,
+      'workPlaceId': s.workPlaceId,
+      'backgroundLocation': s.backgroundLocation,
+      'smartPlaceDetection': s.smartPlaceDetection,
+      'homeDetection': s.homeDetection,
+      'workDetection': s.workDetection,
+      'expensePrompts': s.expensePrompts,
+      'quietHoursStart': s.quietHoursStart,
+      'quietHoursEnd': s.quietHoursEnd,
+      'placeCooldownHours': s.placeCooldownHours,
+      'lastCategoryId': s.lastCategoryId,
+      'lastPaymentMethod': s.lastPaymentMethod.name,
       'weights': s.scoring.weights,
       'ignoreBelow': s.scoring.ignoreBelow,
       'lowBelow': s.scoring.lowBelow,
       'possibleBelow': s.scoring.possibleBelow,
     });
+
+PaymentMethod _payment(String name) {
+  for (final v in PaymentMethod.values) {
+    if (v.name == name) return v;
+  }
+  return PaymentMethod.notSpecified;
+}

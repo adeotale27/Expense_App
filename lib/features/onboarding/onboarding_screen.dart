@@ -29,10 +29,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'Notifications',
       'We remind you at the right moments — never constantly.',
     ),
-    (
-      "You're ready.",
-      'Add your first expense in a few seconds.',
-    ),
+      (
+        'Make it smarter',
+        "Optionally set home later. SpendPing can also learn evening spots without forcing a form.",
+      ),
+      (
+        "You're ready.",
+        'Add your first expense in a few seconds.',
+      ),
   ];
 
   @override

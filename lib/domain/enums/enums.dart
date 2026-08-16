@@ -21,6 +21,12 @@ enum PlaceType {
   atm,
   gym,
   travel,
+  cafe,
+  gaming,
+  cinema,
+  school,
+  hospital,
+  hangout,
   unknown,
   other,
 }
@@ -43,8 +49,16 @@ enum PaymentMethod {
   creditCard,
   debitCard,
   bankTransfer,
+  wallet,
   other,
   notSpecified,
+}
+
+enum PromptKind {
+  expenseOpportunity,
+  homeSuggestion,
+  workSuggestion,
+  placeTypeSuggestion,
 }
 
 enum PromptStyle { frequent, smart, minimal, manualOnly }
@@ -76,6 +90,12 @@ extension PlaceTypeX on PlaceType {
         PlaceType.atm => 'ATM',
         PlaceType.gym => 'Gym',
         PlaceType.travel => 'Travel',
+        PlaceType.cafe => 'Cafe',
+        PlaceType.gaming => 'Gaming',
+        PlaceType.cinema => 'Cinema',
+        PlaceType.school => 'School',
+        PlaceType.hospital => 'Hospital',
+        PlaceType.hangout => 'Hangout',
         PlaceType.unknown => 'Unknown',
         PlaceType.other => 'Other',
       };
@@ -90,6 +110,9 @@ extension PlaceTypeX on PlaceType {
         PlaceType.bank,
         PlaceType.atm,
         PlaceType.gym,
+        PlaceType.cafe,
+        PlaceType.gaming,
+        PlaceType.cinema,
       }.contains(this);
 }
 
@@ -100,8 +123,20 @@ extension PaymentMethodX on PaymentMethod {
         PaymentMethod.creditCard => 'Credit Card',
         PaymentMethod.debitCard => 'Debit Card',
         PaymentMethod.bankTransfer => 'Bank Transfer',
+        PaymentMethod.wallet => 'Wallet',
         PaymentMethod.other => 'Other',
         PaymentMethod.notSpecified => 'Not Specified',
+      };
+
+  String get iconKey => switch (this) {
+        PaymentMethod.upi => 'upi',
+        PaymentMethod.cash => 'cash',
+        PaymentMethod.creditCard => 'card',
+        PaymentMethod.debitCard => 'card',
+        PaymentMethod.bankTransfer => 'bank',
+        PaymentMethod.wallet => 'wallet',
+        PaymentMethod.other => 'other',
+        PaymentMethod.notSpecified => 'other',
       };
 }
 
@@ -118,11 +153,17 @@ String suggestedCategoryName(PlaceType type) => switch (type) {
       PlaceType.fuel => 'Fuel',
       PlaceType.grocery => 'Grocery',
       PlaceType.food => 'Food',
+      PlaceType.cafe => 'Food',
       PlaceType.shopping => 'Shopping',
       PlaceType.entertainment => 'Entertainment',
+      PlaceType.cinema => 'Entertainment',
+      PlaceType.gaming => 'Entertainment',
+      PlaceType.hangout => 'Entertainment',
       PlaceType.health => 'Health',
+      PlaceType.hospital => 'Health',
+      PlaceType.gym => 'Health',
+      PlaceType.school => 'Education',
       PlaceType.atm => 'Other',
-      PlaceType.gym => 'Other',
       PlaceType.work => 'Other',
       PlaceType.home => 'Home',
       _ => 'Other',

@@ -55,7 +55,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           ]),
         ],
       ),
-      GoRoute(path: '/add', builder: (_, __) => const AddExpenseScreen()),
+      GoRoute(
+        path: '/add',
+        builder: (_, s) => AddExpenseScreen(
+          initialAmountMinor: int.tryParse(s.uri.queryParameters['amount'] ?? ''),
+          placeId: s.uri.queryParameters['placeId'],
+        ),
+      ),
       GoRoute(
         path: '/expenses/:id',
         builder: (_, s) => ExpenseDetailScreen(id: s.pathParameters['id']!),

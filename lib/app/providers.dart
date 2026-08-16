@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/app_database.dart';
 import '../data/remote/auth_service.dart';
 import '../data/repositories/drift_repositories.dart';
+import '../data/repositories/intel_store.dart';
 import '../data/sync/sync_engine.dart';
 import '../domain/entities/entities.dart';
 import '../domain/repositories/repositories.dart';
@@ -13,6 +14,8 @@ import '../notifications/notification_service.dart';
 final databaseProvider = Provider<AppDatabase>((ref) {
   throw UnimplementedError();
 });
+
+final pendingRouteProvider = StateProvider<String?>((ref) => null);
 
 final sessionProfileProvider = StateProvider<UserProfile?>((ref) => null);
 
@@ -122,6 +125,14 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   );
 });
 
+final intelRepoProvider = Provider<IntelRepository>((ref) {
+  return DriftIntelRepository(ref.watch(databaseProvider), ref.watch(userIdProvider));
+});
+
+final allCategoriesProvider = StreamProvider<List<Category>>((ref) {
+  return ref.watch(categoryRepoProvider).watchAll();
+});
+
 final locationRuntimeReadyProvider = Provider<LocationRuntime>((ref) {
   final runtime = LocationRuntime(
     userId: ref.watch(userIdProvider),
@@ -133,6 +144,7 @@ final locationRuntimeReadyProvider = Provider<LocationRuntime>((ref) {
     notifications: ref.watch(notificationServiceProvider),
     provider: ref.watch(locationProviderAdapter),
     simulator: ref.watch(simulatorProvider),
+    intel: ref.watch(intelRepoProvider),
   );
   Future<void>.microtask(runtime.start);
   ref.onDispose(runtime.stop);

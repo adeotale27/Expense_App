@@ -11,9 +11,13 @@ import '../domain/entities/entities.dart';
 import '../domain/enums/enums.dart';
 import '../domain/repositories/repositories.dart';
 import '../notifications/notification_service.dart';
+import 'behavior_confidence.dart';
+import 'geofence_manager.dart';
 import 'movement_engine.dart';
 import 'opportunity_engine.dart';
 import 'place_classifier.dart';
+import 'place_memory.dart';
+import 'smart_prompt_manager.dart';
 import 'location_provider.dart';
 
 class LocationRuntime {
@@ -27,6 +31,7 @@ class LocationRuntime {
     required this.notifications,
     required this.provider,
     required this.simulator,
+    required this.intel,
   });
 
   final String userId;
@@ -38,19 +43,27 @@ class LocationRuntime {
   final NotificationService notifications;
   final LocationProvider provider;
   final SimulatedLocationProvider simulator;
+  final IntelRepository intel;
 
   final movement = MovementEngine();
   final engine = OpportunityEngine();
   final classifier = PlaceClassifier();
+  final geofences = GeofenceManager();
+  final confidence = BehaviorConfidence();
+  late final memory = PlaceMemory(places: places, classifier: classifier);
+  late final prompts = SmartPromptManager(intel);
 
   LocationState state = LocationState.unknown;
   Place? currentPlace;
   int lastScore = 0;
   String lastEvent = 'idle';
+  PlaceSuggestion? pendingSuggestion;
+  GeofenceEvent? lastGeofence;
   StreamSubscription<GeoFix>? _sub;
 
   Future<void> start() async {
     final settings = await settingsRepo.get(userId);
+    if (!settings.backgroundLocation) return;
     final known = await places.all();
     if (settings.homePlaceId != null) {
       movement.homePlace = await places.getById(settings.homePlaceId!);
@@ -69,15 +82,27 @@ class LocationRuntime {
   Future<void> _onFix(GeoFix fix) async {
     lastEvent = 'fix';
     final settings = await settingsRepo.get(userId);
+    if (!settings.backgroundLocation) return;
     var known = await places.all();
-    if (known.isEmpty) {
-      known = DemoCatalog.all(userId: userId, deviceId: deviceId);
-      for (final p in known) {
-        await places.upsert(p);
-      }
-    }
     movement.homePlace ??=
         known.where((p) => p.type == PlaceType.home).firstOrNull;
+    final fence = geofences.observe(fix: fix, places: known);
+    if (fence != null) {
+      lastGeofence = fence;
+      lastEvent = fence.entered ? 'geofence-enter' : 'geofence-exit';
+      AppLog.location(
+        '${fence.entered ? 'Entered' : 'Left'} ${fence.place.name}',
+      );
+    }
+    await memory.observeUnknown(
+      fix: fix,
+      known: known,
+      userId: userId,
+      deviceId: deviceId,
+      minStopMinutes: settings.minStopMinutes,
+      enabled: settings.smartPlaceDetection,
+    );
+    known = await places.all();
     final tick = movement.tick(
       fix: fix,
       knownPlaces: known,
@@ -94,9 +119,40 @@ class LocationRuntime {
   }
 
   Future<void> _handleVisit(VisitEvent visit, AppSettings settings) async {
+    final local = visit.startedAt.toLocal();
+    await intel.recordVisit(
+      VisitLog(
+        id: newId(),
+        userId: userId,
+        placeId: visit.place.id,
+        startedAt: visit.startedAt.toUtc(),
+        endedAt: visit.endedAt.toUtc(),
+        durationSeconds: visit.duration.inSeconds,
+        hourOfDay: local.hour,
+        weekday: local.weekday,
+        passThrough: visit.passThrough,
+      ),
+    );
+    final updated = visit.place.copyWith(
+      visitCount: visit.place.visitCount + (visit.passThrough ? 0 : 1),
+      lastVisitedAt: visit.endedAt.toUtc(),
+      firstVisitedAt: visit.place.firstVisitedAt ?? visit.startedAt.toUtc(),
+      updatedAt: utcNow(),
+    );
+    await places.upsert(updated);
+
+    await _maybePlaceSuggestion(updated, settings);
+
+    if (!settings.expensePrompts) return;
     final pending = await opportunities.pending();
     final recent = pending.any((o) => o.placeId == visit.place.id);
     final cat = await categories.byName(suggestedCategoryName(visit.place.type));
+    final throttle = await prompts.allow(
+      settings: settings,
+      kind: PromptKind.expenseOpportunity,
+      placeId: visit.place.id,
+      dismissedRecently: recent,
+    );
     final decision = engine.evaluate(
       visit,
       PromptContext(
@@ -112,11 +168,12 @@ class LocationRuntime {
         promptsToday: pending.length,
         recentPromptAtPlace: recent,
         previouslySpent: visit.place.totalSpendMinor > 0,
+        dismissedRecently: !throttle.allow,
       ),
     );
     lastScore = decision.score;
     AppLog.opportunity('Confidence = ${decision.score} ${decision.reason}');
-    if (!decision.create) return;
+    if (!decision.create || !throttle.allow) return;
 
     final opp = engine.toOpportunity(
       visit: visit,
@@ -128,7 +185,113 @@ class LocationRuntime {
     await opportunities.upsert(opp);
     final nid = 'opp-${opp.id}';
     await opportunities.upsert(opp.copyWith(notificationId: nid, updatedAt: utcNow()));
+    await intel.recordPrompt(
+      PromptEvent(
+        id: newId(),
+        userId: userId,
+        kind: PromptKind.expenseOpportunity,
+        placeId: visit.place.id,
+        createdAt: utcNow(),
+      ),
+    );
     await notifications.showOpportunity(opp, visit.place);
+  }
+
+  Future<void> _maybePlaceSuggestion(Place place, AppSettings settings) async {
+    final visits = await intel.visitsFor(place.id);
+    final promptsLog = await intel.recentPrompts();
+    final declinedHome = {
+      for (final p in promptsLog.where((e) =>
+          e.kind == PromptKind.homeSuggestion && e.response == 'no'))
+        if (p.placeId != null) p.placeId!,
+    };
+    final declinedWork = {
+      for (final p in promptsLog.where((e) =>
+          e.kind == PromptKind.workSuggestion && e.response == 'no'))
+        if (p.placeId != null) p.placeId!,
+    };
+    final declinedType = {
+      for (final p in promptsLog.where((e) =>
+          e.kind == PromptKind.placeTypeSuggestion && e.response == 'no'))
+        if (p.placeId != null) p.placeId!,
+    };
+    final suggestion = confidence.maybeSuggest(
+      place: place,
+      visits: visits,
+      settings: settings,
+      declinedHome: declinedHome,
+      declinedWork: declinedWork,
+      declinedType: declinedType,
+    );
+    if (suggestion == null) return;
+    final gate = await prompts.allow(
+      settings: settings,
+      kind: suggestion.kind,
+      placeId: place.id,
+    );
+    if (!gate.allow) return;
+    pendingSuggestion = suggestion;
+    await intel.recordPrompt(
+      PromptEvent(
+        id: newId(),
+        userId: userId,
+        kind: suggestion.kind,
+        placeId: place.id,
+        createdAt: utcNow(),
+      ),
+    );
+    await notifications.showPlaceSuggestion(suggestion);
+  }
+
+  Future<void> answerSuggestion(PlaceSuggestion suggestion, bool yes) async {
+    pendingSuggestion = null;
+    await intel.recordPrompt(
+      PromptEvent(
+        id: newId(),
+        userId: userId,
+        kind: suggestion.kind,
+        placeId: suggestion.place.id,
+        createdAt: utcNow(),
+        response: yes ? 'yes' : 'no',
+      ),
+    );
+    if (!yes) return;
+    var place = suggestion.place;
+    var settings = await settingsRepo.get(userId);
+    if (suggestion.kind == PromptKind.homeSuggestion) {
+      place = place.copyWith(
+        type: PlaceType.home,
+        name: place.userConfirmedName ? place.name : 'Home',
+        geofenceEnabled: true,
+        userConfirmedName: true,
+        updatedAt: utcNow(),
+      );
+      await settingsRepo.save(settings.copyWith(homePlaceId: place.id));
+      movement.homePlace = place;
+    } else if (suggestion.kind == PromptKind.workSuggestion) {
+      place = place.copyWith(
+        type: PlaceType.work,
+        name: place.userConfirmedName ? place.name : 'Work',
+        geofenceEnabled: true,
+        userConfirmedName: true,
+        updatedAt: utcNow(),
+      );
+      await settingsRepo.save(settings.copyWith(workPlaceId: place.id));
+    } else {
+      final guessed = classifier.suggestFromPattern(
+        nightVisits: 0,
+        weekdayDaytimeVisits: 0,
+        eveningVisits: 1,
+        totalVisits: place.visitCount,
+        current: PlaceType.hangout,
+      );
+      place = place.copyWith(
+        type: guessed,
+        userConfirmedName: true,
+        updatedAt: utcNow(),
+      );
+    }
+    await places.upsert(place);
   }
 
   Future<void> simulate({
@@ -179,12 +342,6 @@ class LocationRuntime {
     }
   }
 
-  Future<void> maybeLearnPlace(Place place) async {
-    if (place.visitCount == 10 && place.name.startsWith('Near ')) {
-      AppLog.place('You visit this place often.');
-    }
-  }
-
   Future<Place> rememberUnknown(GeoFix fix, String name) async {
     final place = Place(
       id: newId(),
@@ -193,6 +350,11 @@ class LocationRuntime {
       type: classifier.classifyName(name),
       latitude: fix.latitude,
       longitude: fix.longitude,
+      radius: 150,
+      geofenceEnabled: true,
+      userConfirmedName: true,
+      firstVisitedAt: utcNow(),
+      lastVisitedAt: utcNow(),
       createdAt: utcNow(),
       updatedAt: utcNow(),
       deviceId: deviceId,

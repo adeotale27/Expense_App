@@ -24,6 +24,12 @@ class DeveloperScreen extends ConsumerWidget {
     _Sim('Office 8h', 'home', 'office', Duration(hours: 8), false),
     _Sim('Restaurant 45m', 'home', 'restaurant', Duration(minutes: 45), true),
     _Sim('Petrol 6m', 'home', 'petrol', Duration(minutes: 6), true),
+    _Sim('Mall 40m', 'home', 'mall', Duration(minutes: 40), true),
+    _Sim('Cafe 25m', 'home', 'cafe', Duration(minutes: 25), true),
+    _Sim('Gaming 90m', 'home', 'gaming', Duration(minutes: 90), true),
+    _Sim('Cinema 140m', 'home', 'cinema', Duration(minutes: 140), true),
+    _Sim('Gym 55m', 'home', 'gym', Duration(minutes: 55), true),
+    _Sim('Repeat grocery', 'home', 'grocery', Duration(minutes: 12), true),
   ];
 
   @override
@@ -39,6 +45,8 @@ class DeveloperScreen extends ConsumerWidget {
           Text('Current place: ${runtime.currentPlace?.name ?? 'none'}'),
           Text('Last score: ${runtime.lastScore}'),
           Text('Last event: ${runtime.lastEvent}'),
+          Text('Geofence: ${runtime.lastGeofence == null ? 'none' : (runtime.lastGeofence!.entered ? 'enter' : 'exit')} ${runtime.lastGeofence?.place.name ?? ''}'),
+          Text('Suggestion: ${runtime.pendingSuggestion?.headline ?? 'none'}'),
           Text('Sync: ${sync.status}'),
           Text('Firebase: ${FirebaseBootstrap.available}'),
           FutureBuilder(
@@ -47,8 +55,10 @@ class DeveloperScreen extends ConsumerWidget {
           ),
           const Divider(),
           const Text('Simulate visit', style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               for (final item in _sims)
                 FilledButton.tonal(
@@ -68,6 +78,10 @@ class DeveloperScreen extends ConsumerWidget {
                   child: Text(item.label),
                 ),
             ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Repeat grocery / office / cafe sims over several days (change device clock or fire multiple times) to exercise home/work/hangout confidence and prompt throttling.',
           ),
         ],
       ),

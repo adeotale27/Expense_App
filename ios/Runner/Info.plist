@@ -45,6 +45,19 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.spendping.spendping</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>spendping</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SpendPing uses your location to notice meaningful places and remind you to record expenses. Location is processed on this device.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
