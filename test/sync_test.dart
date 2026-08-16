@@ -15,7 +15,12 @@ void main() {
     db = AppDatabase.memory();
     repo = DriftExpenseRepository(db, 'u1');
     remote = MemoryRemoteStore();
-    sync = SyncEngine(db: db, userId: 'u1', remote: remote);
+    sync = SyncEngine(
+      db: db,
+      userId: 'u1',
+      ownerEmail: 'you@gmail.com',
+      remote: remote,
+    );
   });
 
   tearDown(() async => db.close());
@@ -38,6 +43,7 @@ void main() {
     final remoteRows = await remote.fetchAll('expenses');
     expect(remoteRows.length, 1);
     expect(remoteRows['exp-1']?['amountMinor'], 25000);
+    expect(remoteRows['exp-1']?['ownerEmail'], 'you@gmail.com');
     await sync.syncAll();
     expect((await remote.fetchAll('expenses')).length, 1);
   });

@@ -42,8 +42,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
-        data: (s) => ListView(
-          children: [
+        data: (s) {
+          return ListView(
+            children: [
             ListTile(
               title: const Text('Analytics'),
               trailing: const Icon(Icons.chevron_right),
@@ -222,6 +223,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const Divider(),
             ListTile(
+              title: const Text('Account'),
+              subtitle: Text(
+                ref.watch(sessionProfileProvider)?.email?.isNotEmpty == true
+                    ? '${ref.watch(sessionProfileProvider)!.email} — spends follow this email on a new phone after Google sign-in.'
+                    : 'This phone only. Sign in with Google so spends can restore on another device.',
+              ),
+            ),
+            ListTile(
               title: const Text('Export data'),
               onTap: () => _export(ref),
             ),
@@ -306,7 +315,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 32),
           ],
-        ),
+          );
+        },
       ),
     );
   }

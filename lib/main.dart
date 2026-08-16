@@ -8,7 +8,6 @@ import 'app/providers.dart';
 import 'app/quick_spend.dart';
 import 'data/local/app_database.dart';
 import 'data/remote/auth_service.dart';
-import 'data/sync/sync_engine.dart';
 import 'location/location_provider.dart';
 import 'notifications/notification_service.dart';
 
@@ -29,10 +28,6 @@ Future<void> main() async {
 
   final merged = _MergedLocationProvider(platform: location, simulator: simulator);
 
-  final remote = FirebaseBootstrap.available && user != null
-      ? FirestoreRemoteStore(user.id)
-      : MemoryRemoteStore();
-
   final container = ProviderContainer(
     overrides: [
       databaseProvider.overrideWithValue(db),
@@ -41,7 +36,6 @@ Future<void> main() async {
       notificationServiceProvider.overrideWithValue(notifications),
       simulatorProvider.overrideWithValue(simulator),
       locationProviderAdapter.overrideWithValue(merged),
-      remoteStoreProvider.overrideWithValue(remote),
     ],
   );
 

@@ -13,6 +13,8 @@ import '../../core/utils/ids.dart';
 import '../../domain/entities/entities.dart';
 import '../../domain/enums/enums.dart';
 import '../local/app_database.dart';
+import 'account_ownership.dart';
+import 'cloud_account.dart';
 
 class FirebaseBootstrap {
   static bool available = false;
@@ -63,8 +65,11 @@ class SessionStore {
   Future<void> save(UserProfile user) async {
     await _storage.write(key: _userKey, value: user.id);
     await _storage.write(key: _nameKey, value: user.displayName);
-    if (user.email != null) {
-      await _storage.write(key: _emailKey, value: user.email);
+    final email = AccountOwnership.normalizeEmail(user.email);
+    if (email != null) {
+      await _storage.write(key: _emailKey, value: email);
+    } else {
+      await _storage.delete(key: _emailKey);
     }
     await _storage.write(key: _providerKey, value: user.provider.name);
   }
@@ -95,6 +100,20 @@ class AuthService {
     return user;
   }
 
+  Future<UserProfile> _finishSignedIn(UserProfile user) async {
+    final previous = await session.current();
+    if (previous != null && previous.id != user.id) {
+      await AccountOwnership.reassign(
+        db,
+        fromUserId: previous.id,
+        toUserId: user.id,
+      );
+    }
+    await session.save(user);
+    await CloudAccountDirectory.bind(user);
+    return user;
+  }
+
   Future<UserProfile> registerEmail(String email, String password, String name) async {
     if (FirebaseBootstrap.available) {
       final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -108,8 +127,7 @@ class AuthService {
         provider: AuthProviderType.email,
         createdAt: DateTime.now().toUtc(),
       );
-      await session.save(user);
-      return user;
+      return _finishSignedIn(user);
     }
     final salt = newId();
     final hash = sha256.convert(utf8.encode('$salt:$password')).toString();
@@ -131,8 +149,7 @@ class AuthService {
       provider: AuthProviderType.email,
       createdAt: DateTime.now().toUtc(),
     );
-    await session.save(user);
-    return user;
+    return _finishSignedIn(user);
   }
 
   Future<UserProfile> signInEmail(String email, String password) async {
@@ -148,8 +165,7 @@ class AuthService {
         provider: AuthProviderType.email,
         createdAt: DateTime.now().toUtc(),
       );
-      await session.save(user);
-      return user;
+      return _finishSignedIn(user);
     }
     final row = await (db.select(db.localAccounts)
           ..where((t) => t.email.equals(email.toLowerCase())))
@@ -168,8 +184,7 @@ class AuthService {
       provider: AuthProviderType.email,
       createdAt: row.createdAt,
     );
-    await session.save(user);
-    return user;
+    return _finishSignedIn(user);
   }
 
   Future<UserProfile> signInGoogle() async {
@@ -195,8 +210,7 @@ class AuthService {
         provider: AuthProviderType.google,
         createdAt: DateTime.now().toUtc(),
       );
-      await session.save(user);
-      return user;
+      return _finishSignedIn(user);
     }
     final user = UserProfile(
       id: 'google-${googleUser.id}',
@@ -205,8 +219,7 @@ class AuthService {
       provider: AuthProviderType.google,
       createdAt: DateTime.now().toUtc(),
     );
-    await session.save(user);
-    return user;
+    return _finishSignedIn(user);
   }
 
   Future<UserProfile> signInApple() async {
@@ -235,8 +248,7 @@ class AuthService {
       provider: AuthProviderType.apple,
       createdAt: DateTime.now().toUtc(),
     );
-    await session.save(user);
-    return user;
+    return _finishSignedIn(user);
   }
 
   Future<void> signOut() async {
