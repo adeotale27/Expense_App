@@ -36,12 +36,21 @@ class MainActivity : FlutterActivity() {
         }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, widgetName)
             .setMethodCallHandler { call, result ->
-                if (call.method == "publishToday") {
-                    val total = call.argument<String>("total") ?: "₹0"
-                    QuickAddWidget.publishToday(this, total)
-                    result.success(null)
-                } else {
-                    result.notImplemented()
+                when (call.method) {
+                    "publishToday" -> {
+                        val total = call.argument<String>("total") ?: "₹0"
+                        QuickAddWidget.publishToday(this, total)
+                        result.success(null)
+                    }
+                    "mapsKey" -> {
+                        val appInfo = packageManager.getApplicationInfo(
+                            packageName,
+                            android.content.pm.PackageManager.GET_META_DATA
+                        )
+                        val key = appInfo.metaData?.getString("com.google.android.geo.API_KEY")
+                        result.success(key)
+                    }
+                    else -> result.notImplemented()
                 }
             }
     }

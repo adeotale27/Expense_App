@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,7 +38,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   String _friendly(Object e) {
     final s = e.toString();
     if (s.contains('Firebase') || s.contains('needs Firebase')) {
-      return 'Cloud sign-in is not configured yet. Continue locally or use email on this device.';
+      return 'Cloud restore is optional. Google sign-in still works on this device.';
     }
     if (s.contains('password')) return 'Check your email and password.';
     if (s.contains('cancelled')) return 'Sign-in was cancelled.';
@@ -62,17 +63,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ),
+          if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+            FilledButton(
+              onPressed: busy
+                  ? null
+                  : () => _run(() async {
+                        final user = await auth.signInApple();
+                        ref.read(sessionProfileProvider.notifier).state = user;
+                      }),
+              child: const Text('Sign in with Apple'),
+            ),
+            const SizedBox(height: 10),
+          ],
           FilledButton(
-            onPressed: busy
-                ? null
-                : () => _run(() async {
-                      final user = await auth.signInApple();
-                      ref.read(sessionProfileProvider.notifier).state = user;
-                    }),
-            child: const Text('Sign in with Apple'),
-          ),
-          const SizedBox(height: 10),
-          FilledButton.tonal(
             onPressed: busy
                 ? null
                 : () => _run(() async {

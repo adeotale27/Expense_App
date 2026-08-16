@@ -1,32 +1,20 @@
 import WidgetKit
 import SwiftUI
 
-/// Standalone WidgetKit source. Add an iOS Widget Extension target in Xcode
-/// and include this file so users can pin a home-screen quick-add widget.
+/// Standalone WidgetKit source. Add an iOS Widget Extension target in Xcode.
 struct SpendPingQuickAddWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "SpendPingQuickAdd", provider: QuickAddProvider()) { _ in
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("TODAY").font(.caption.weight(.bold))
-                Text("Amount, then what").font(.caption2)
-                HStack {
-                    Link("₹50", destination: URL(string: "spendping://add?amount=5000")!)
-                    Link("₹100", destination: URL(string: "spendping://add?amount=10000")!)
-                    Link("₹200", destination: URL(string: "spendping://add?amount=20000")!)
-                    Link("₹500", destination: URL(string: "spendping://add?amount=50000")!)
-                }
-                HStack {
-                    Link("Food", destination: URL(string: "spendping://quick?amount=10000&what=Food")!)
-                    Link("Travel", destination: URL(string: "spendping://quick?amount=10000&what=Travel")!)
-                    Link("Other", destination: URL(string: "spendping://quick?amount=10000&what=Other")!)
-                    Link("Type", destination: URL(string: "spendping://add")!)
-                }
+                Text("Type amount, then save").font(.caption2)
+                Link("Add spend", destination: URL(string: "spendping://compose")!)
             }
             .padding()
         }
         .configurationDisplayName("SpendPing Quick Add")
-        .description("Tap amount, then what. It shows up in today's spends.")
-        .supportedFamilies([.systemMedium])
+        .description("Opens a box to type amount, Food or Fuel, then Save.")
+        .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
 

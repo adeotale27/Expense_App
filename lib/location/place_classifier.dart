@@ -31,7 +31,16 @@ class PlaceClassifier {
         n.contains('lunch') ||
         n.contains('food') ||
         n.contains('hotel') ||
-        n.contains('dine')) {
+        n.contains('dine') ||
+        n.contains('mcdonald') ||
+        n.contains('kfc') ||
+        n.contains('domino') ||
+        n.contains('pizza') ||
+        n.contains('biryani') ||
+        n.contains('dhaba') ||
+        n.contains('kitchen') ||
+        n.contains('eatery') ||
+        n.contains('bistro')) {
       return PlaceType.food;
     }
     if (n.contains('cinema') || n.contains('movie') || n.contains('pvr') || n.contains('inox')) {
@@ -51,6 +60,35 @@ class PlaceClassifier {
     if (n.contains('gym') || n.contains('fitness')) return PlaceType.gym;
     if (n.contains('hangout') || n.contains('friends')) return PlaceType.hangout;
     return PlaceType.unknown;
+  }
+
+  PlaceType? classifyGoogleTypes(List<String> types) {
+    final t = types.map((e) => e.toLowerCase()).toSet();
+    if (t.contains('restaurant') ||
+        t.contains('meal_takeaway') ||
+        t.contains('meal_delivery')) {
+      return PlaceType.food;
+    }
+    if (t.contains('cafe') || t.contains('bakery') || t.contains('bar')) {
+      return PlaceType.cafe;
+    }
+    if (t.contains('gas_station')) return PlaceType.fuel;
+    if (t.contains('grocery_or_supermarket') ||
+        t.contains('supermarket') ||
+        t.contains('convenience_store')) {
+      return PlaceType.grocery;
+    }
+    if (t.contains('movie_theater')) return PlaceType.cinema;
+    if (t.contains('gym')) return PlaceType.gym;
+    if (t.contains('hospital') || t.contains('doctor')) return PlaceType.hospital;
+    if (t.contains('pharmacy')) return PlaceType.health;
+    if (t.contains('shopping_mall') || t.contains('clothing_store') || t.contains('store')) {
+      return PlaceType.shopping;
+    }
+    if (t.contains('school') || t.contains('university')) return PlaceType.school;
+    if (t.contains('bank')) return PlaceType.bank;
+    if (t.contains('atm')) return PlaceType.atm;
+    return null;
   }
 
   PlaceType suggestFromPattern({

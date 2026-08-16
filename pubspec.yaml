@@ -1,7 +1,7 @@
 name: spendping
 description: SpendPing — a context-aware personal expense assistant
 publish_to: "none"
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.8.1
@@ -35,6 +35,7 @@ dependencies:
   timezone: ^0.10.0
   rxdart: ^0.28.0
   share_plus: ^10.1.4
+  http: ^1.3.0
 
 dev_dependencies:
   flutter_test:

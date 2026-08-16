@@ -24,6 +24,7 @@ abstract class LocationProvider {
   Future<void> startMonitoring();
   Future<void> stopMonitoring();
   Future<GeoFix?> getCurrentLocation();
+  Future<GeoFix?> getPreciseLocation();
   Stream<GeoFix> get fixes;
 }
 
@@ -51,6 +52,9 @@ class SimulatedLocationProvider implements LocationProvider {
 
   @override
   Future<GeoFix?> getCurrentLocation() async => _last;
+
+  @override
+  Future<GeoFix?> getPreciseLocation() async => _last;
 
   void emit(GeoFix fix) {
     _last = fix;
@@ -116,7 +120,7 @@ class PlatformLocationProvider implements LocationProvider {
       if (!enabled) return null;
       if (!await hasPermission()) return null;
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       return GeoFix(
         latitude: pos.latitude,
@@ -134,8 +138,8 @@ class PlatformLocationProvider implements LocationProvider {
     if (!await hasPermission()) return;
     await _sub?.cancel();
     const settings = LocationSettings(
-      accuracy: LocationAccuracy.low,
-      distanceFilter: 80,
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 25,
     );
     _sub = Geolocator.getPositionStream(locationSettings: settings).listen((p) {
       _controller.add(
@@ -147,6 +151,27 @@ class PlatformLocationProvider implements LocationProvider {
         ),
       );
     });
+  }
+
+  @override
+  Future<GeoFix?> getPreciseLocation() async {
+    try {
+      if (!await hasPermission()) return null;
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.best,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      return GeoFix(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        accuracy: pos.accuracy,
+        timestamp: pos.timestamp,
+      );
+    } catch (_) {
+      return getCurrentLocation();
+    }
   }
 
   @override

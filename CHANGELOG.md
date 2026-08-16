@@ -8,7 +8,16 @@ and this project uses [Semantic Versioning](https://semver.org/).
 App version is sourced from:
 
 - `VERSION` — marketing version (`MAJOR.MINOR.PATCH`)
-- `pubspec.yaml` `version` — `VERSION+BUILD` (currently `1.0.0+1`)
+- `pubspec.yaml` `version` — `VERSION+BUILD` (currently `1.0.1+2`)
+
+## [1.0.1] — 2026-08-16
+
+### Added
+
+- Google Sign-In on Android (Firebase when configured; on-device Google profile otherwise)
+- Play Store packaging: minSdk 24, targetSdk 35, upload keystore via `key.properties`
+- Home widget compose: type amount, Food / Fuel / Other + type, Save
+- Google Places Nearby Search to name restaurants and pumps after a stay (optional API key)
 
 ## [1.0.0] — 2026-08-13
 

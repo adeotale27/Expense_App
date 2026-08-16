@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="quick_add_widget_description">Tap an amount, then Food / Travel / Other. It lands in today\'s spends.</string>
+    <string name="quick_add_widget_description">Type an amount, pick Food or Fuel, Save. Lands in today\'s spends.</string>
+    <string name="google_maps_key" translatable="false"></string>
 </resources>
