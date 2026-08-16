@@ -59,12 +59,35 @@ class LocationRuntime {
   String lastEvent = 'idle';
   PlaceSuggestion? pendingSuggestion;
   GeofenceEvent? lastGeofence;
+  GeoFix? lastFix;
+  bool permissionGranted = false;
+  bool monitoring = false;
   StreamSubscription<GeoFix>? _sub;
+  final _pulses = StreamController<int>.broadcast();
+  int _pulse = 0;
 
-  Future<void> start() async {
+  Stream<int> get pulses => _pulses.stream;
+
+  void _pulseUi() {
+    _pulse += 1;
+    if (!_pulses.isClosed) _pulses.add(_pulse);
+  }
+
+  Future<void> start({bool force = false}) async {
+    if (force) {
+      await _sub?.cancel();
+      _sub = null;
+      monitoring = false;
+      await provider.stopMonitoring();
+    }
     if (_sub != null) return;
+    permissionGranted = await provider.hasPermission();
+    if (!permissionGranted) {
+      lastEvent = 'needs-permission';
+      _pulseUi();
+      return;
+    }
     final settings = await settingsRepo.get(userId);
-    if (!settings.backgroundLocation) return;
     final known = await places.all();
     if (settings.homePlaceId != null) {
       movement.homePlace = await places.getById(settings.homePlaceId!);
@@ -73,17 +96,29 @@ class LocationRuntime {
         known.where((p) => p.type == PlaceType.home).firstOrNull;
     _sub = provider.fixes.listen(_onFix);
     await provider.startMonitoring();
+    monitoring = true;
+    lastEvent = 'listening';
+    _pulseUi();
+    try {
+      final here = await provider.getCurrentLocation();
+      if (here != null) await _onFix(here);
+    } catch (_) {}
   }
+
+  Future<void> restart() => start(force: true);
 
   Future<void> stop() async {
     await _sub?.cancel();
+    _sub = null;
+    monitoring = false;
     await provider.stopMonitoring();
   }
 
   Future<void> _onFix(GeoFix fix) async {
+    lastFix = fix;
     lastEvent = 'fix';
+    _pulseUi();
     final settings = await settingsRepo.get(userId);
-    if (!settings.backgroundLocation) return;
     var known = await places.all();
     movement.homePlace ??=
         known.where((p) => p.type == PlaceType.home).firstOrNull;
@@ -117,6 +152,7 @@ class LocationRuntime {
       AppLog.location('Visit ended ${visit.place.name} ${visit.duration}');
       await _handleVisit(visit, settings);
     }
+    _pulseUi();
   }
 
   Future<void> _handleVisit(VisitEvent visit, AppSettings settings) async {

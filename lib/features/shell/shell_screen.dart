@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class ShellScreen extends StatelessWidget {
+import '../people/add_friend_sheet.dart';
+import '../places/places_screen.dart';
+
+class ShellScreen extends ConsumerWidget {
   const ShellScreen({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final index = navigationShell.currentIndex;
+    final tooltip = switch (index) {
+      2 => 'Remember this place',
+      3 => 'Add friend',
+      _ => 'Add expense',
+    };
     return Scaffold(
       body: navigationShell,
       floatingActionButton: DecoratedBox(
@@ -23,15 +33,23 @@ class ShellScreen extends StatelessWidget {
           ],
         ),
         child: FloatingActionButton(
-          tooltip: 'Add expense',
+          tooltip: tooltip,
           backgroundColor: scheme.primary,
           foregroundColor: scheme.onPrimary,
-          onPressed: () => context.push('/add'),
+          onPressed: () {
+            if (index == 2) {
+              showRememberPlaceSheet(context, ref);
+            } else if (index == 3) {
+              showAddFriendSheet(context, ref);
+            } else {
+              context.push('/add');
+            }
+          },
           child: const Icon(Icons.add_rounded, size: 32),
         ),
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
+        selectedIndex: index,
         onDestinationSelected: navigationShell.goBranch,
         destinations: const [
           NavigationDestination(

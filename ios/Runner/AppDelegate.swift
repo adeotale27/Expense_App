@@ -39,6 +39,12 @@ import UIKit
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
     launchUri = url.absoluteString
+    if let controller = window?.rootViewController as? FlutterViewController {
+      FlutterMethodChannel(
+        name: "spendping/launch",
+        binaryMessenger: controller.binaryMessenger
+      ).invokeMethod("opened", arguments: url.absoluteString)
+    }
     return true
   }
 }

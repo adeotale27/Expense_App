@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/utils/dates.dart';
 import '../data/local/app_database.dart';
 import '../data/remote/auth_service.dart';
 import '../data/repositories/drift_repositories.dart';
@@ -16,6 +17,8 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 });
 
 final pendingRouteProvider = StateProvider<String?>((ref) => null);
+
+final pendingLaunchUriProvider = StateProvider<String?>((ref) => null);
 
 final sessionProfileProvider = StateProvider<UserProfile?>((ref) => null);
 
@@ -99,6 +102,18 @@ final settingsProvider = StreamProvider<AppSettings>((ref) {
 
 final recentExpensesProvider = StreamProvider<List<Expense>>((ref) {
   return ref.watch(expenseRepoProvider).watchRecent(limit: 80);
+});
+
+final todayExpensesProvider = StreamProvider<List<Expense>>((ref) {
+  final now = DateTime.now();
+  return ref.watch(expenseRepoProvider).watchBetween(
+        startOfLocalDay(now).toUtc(),
+        endOfLocalDay(now).toUtc(),
+      );
+});
+
+final locationPulseProvider = StreamProvider<int>((ref) {
+  return ref.watch(locationRuntimeReadyProvider).pulses;
 });
 
 final categoriesProvider = StreamProvider<List<Category>>((ref) {

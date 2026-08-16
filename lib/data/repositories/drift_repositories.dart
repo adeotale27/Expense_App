@@ -28,6 +28,21 @@ class DriftExpenseRepository implements ExpenseRepository {
   }
 
   @override
+  Stream<List<Expense>> watchBetween(DateTime from, DateTime to) {
+    return (db.select(db.expenses)
+          ..where(
+            (t) =>
+                t.userId.equals(userId) &
+                t.deletedAt.isNull() &
+                t.timestamp.isBiggerOrEqualValue(from) &
+                t.timestamp.isSmallerOrEqualValue(to),
+          )
+          ..orderBy([(t) => OrderingTerm.desc(t.timestamp)]))
+        .watch()
+        .map((rows) => rows.map(expenseFromRow).toList());
+  }
+
+  @override
   Future<List<Expense>> list(ExpenseQuery query) async {
     final from = query.from;
     final to = query.to;

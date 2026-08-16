@@ -5,16 +5,20 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/haptics.dart';
 import '../../app/providers.dart';
+import '../../app/quick_spend.dart';
 import '../../core/utils/dates.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/money.dart';
 import '../../domain/entities/entities.dart';
 import '../../domain/enums/enums.dart';
+import '../../location/location_service.dart';
 import '../expenses/add_expense_screen.dart';
 import '../habits/habit_engine.dart';
 import '../shared/action_sheet.dart';
 import '../shared/selection_grids.dart';
 import '../shared/widgets.dart';
+
+int? _lastPublishedToday;
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -96,10 +100,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _enableLocation() async {
     final ok = await ref.read(locationProviderAdapter).requestPermission();
-    if (!ok) return;
+    if (!ok) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permission is needed for visit pings.')),
+        );
+      }
+      return;
+    }
+    await ref.read(notificationServiceProvider).requestPermission();
     final settings = await ref.read(settingsRepoProvider).get(ref.read(userIdProvider));
-    await ref.read(settingsRepoProvider).save(settings.copyWith(backgroundLocation: true));
-    await ref.read(locationRuntimeReadyProvider).start();
+    await ref.read(settingsRepoProvider).save(
+          settings.copyWith(
+            backgroundLocation: true,
+            smartPlaceDetection: true,
+          ),
+        );
+    await ref.read(locationRuntimeReadyProvider).restart();
     if (mounted) setState(() {});
   }
 
@@ -156,29 +173,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(locationPulseProvider);
     ref.watch(locationRuntimeReadyProvider);
     final runtime = ref.read(locationRuntimeReadyProvider);
-    final expenses = ref.watch(recentExpensesProvider).valueOrNull ?? [];
+    final expenses = ref.watch(todayExpensesProvider).valueOrNull ?? [];
     final pending = ref.watch(pendingOpportunitiesProvider).valueOrNull ?? [];
     final cats = ref.watch(categoriesProvider).valueOrNull ?? [];
     final placeList = ref.watch(placesProvider).valueOrNull ?? [];
     final places = {for (final p in placeList) p.id: p};
     final now = DateTime.now();
-    final todayStart = startOfLocalDay(now);
-    var today = 0;
-    final todayItems = <Expense>[];
-    for (final e in expenses) {
-      final local = e.timestamp.toLocal();
-      if (!local.isBefore(todayStart)) {
-        today += e.amount.minorUnits;
-        todayItems.add(e);
-      }
+    final todayItems = [...expenses]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final today = todayItems.fold<int>(0, (p, e) => p + e.amount.minorUnits);
+    if (_lastPublishedToday != today) {
+      _lastPublishedToday = today;
+      publishTodayTotal(today);
     }
-    todayItems.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final catMap = {for (final c in cats) c.id: c};
+    final recent = ref.watch(recentExpensesProvider).valueOrNull ?? [];
     final settings = ref.watch(settingsProvider).valueOrNull;
     final habits = HabitEngine().learn(
-      expenses: expenses,
+      expenses: recent,
       places: placeList,
       visits: const [],
       settings: settings,
@@ -217,92 +231,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            if (here == null && topOpp == null && suggestion == null)
-              QuietCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Location intelligence',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'SpendPing remembers places you visit and asks before logging anything. GPS never creates an expense on its own.',
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton.tonal(
-                      onPressed: _enableLocation,
-                      child: const Text('Enable location'),
-                    ),
-                  ],
-                ),
-              )
-            else if (here != null || topOpp != null || suggestion != null)
-              QuietCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      here != null
-                          ? '📍 ${here.name}'
-                          : suggestion?.headline ??
-                              '📍 ${place?.name ?? topOpp?.suggestedMerchantName ?? 'A place'}',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      suggestion?.body ??
-                          (topOpp != null
-                              ? 'Did you spend anything here?'
-                              : 'SpendPing noticed a visit. Nothing is recorded until you confirm.'),
-                    ),
-                    if (suggestion != null || topOpp != null) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: () async {
-                                if (suggestion != null) {
-                                  await runtime.answerSuggestion(suggestion, true);
-                                  setState(() {});
-                                } else if (topOpp != null) {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => AddExpenseScreen(opportunity: topOpp),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: const Text('Yes, record it'),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                if (suggestion != null) {
-                                  await runtime.answerSuggestion(suggestion, false);
-                                } else if (topOpp != null) {
-                                  await ref.read(opportunityRepoProvider).upsert(
-                                        topOpp.copyWith(
-                                          status: OpportunityStatus.nothingSpent,
-                                          updatedAt: DateTime.now().toUtc(),
-                                        ),
-                                      );
-                                }
-                                setState(() {});
-                              },
-                              child: const Text('Not this time'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            _LocationCard(
+              runtime: runtime,
+              here: here,
+              suggestion: suggestion,
+              topOpp: topOpp,
+              place: place,
+              onEnable: _enableLocation,
+            ),
             const SizedBox(height: 14),
             QuietCard(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -344,12 +280,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            Text('Recent', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+            Text("Today's spends", style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             if (todayItems.isEmpty)
               const Text('Nothing yet today. Type an amount above — it takes a second.')
             else
-              for (final e in todayItems.take(8))
+              for (final e in todayItems)
                 _ExpenseTile(
                   expense: e,
                   category: catMap[e.categoryId],
@@ -396,6 +332,119 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (action == 'del') {
       await ref.read(expenseRepoProvider).softDelete(e.id, DateTime.now().toUtc());
     }
+  }
+}
+
+class _LocationCard extends ConsumerWidget {
+  const _LocationCard({
+    required this.runtime,
+    required this.here,
+    required this.suggestion,
+    required this.topOpp,
+    required this.place,
+    required this.onEnable,
+  });
+
+  final LocationRuntime runtime;
+  final Place? here;
+  final PlaceSuggestion? suggestion;
+  final ExpenseOpportunity? topOpp;
+  final Place? place;
+  final VoidCallback onEnable;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final listening = runtime.permissionGranted || runtime.monitoring;
+    if (!listening && here == null && suggestion == null && topOpp == null) {
+      return QuietCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Location intelligence',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'After you allow location, SpendPing watches visits and notifies you. GPS never creates an expense on its own.',
+            ),
+            const SizedBox(height: 12),
+            FilledButton.tonal(
+              onPressed: onEnable,
+              child: const Text('Enable location intelligence'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final title = here != null
+        ? '📍 ${here!.name}'
+        : suggestion?.headline ??
+            (topOpp != null
+                ? '📍 ${place?.name ?? topOpp?.suggestedMerchantName ?? 'A place'}'
+                : 'Watching this area');
+    final body = suggestion?.body ??
+        (topOpp != null
+            ? 'Did you spend anything here?'
+            : here != null
+                ? 'SpendPing noticed a visit. Nothing is recorded until you confirm.'
+                : 'Location is on. Stay somewhere a few minutes and we will ask if you spent.');
+
+    return QuietCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(body),
+          if (suggestion != null || topOpp != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () async {
+                      if (suggestion != null) {
+                        await runtime.answerSuggestion(suggestion!, true);
+                      } else if (topOpp != null) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => AddExpenseScreen(opportunity: topOpp),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Yes, record it'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      if (suggestion != null) {
+                        await runtime.answerSuggestion(suggestion!, false);
+                      } else if (topOpp != null) {
+                        await ref.read(opportunityRepoProvider).upsert(
+                              topOpp!.copyWith(
+                                status: OpportunityStatus.nothingSpent,
+                                updatedAt: DateTime.now().toUtc(),
+                              ),
+                            );
+                      }
+                    },
+                    child: const Text('Not this time'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

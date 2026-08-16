@@ -6,24 +6,40 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val channel = "spendping/launch"
+    private val launchName = "spendping/launch"
+    private val widgetName = "spendping/widget"
+    private var launchChannel: MethodChannel? = null
     private var launchUri: String? = null
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        launchUri = intent.data?.toString()
+        val uri = intent.data?.toString()
+        if (!uri.isNullOrBlank()) {
+            launchUri = uri
+            launchChannel?.invokeMethod("opened", uri)
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         launchUri = intent?.data?.toString() ?: launchUri
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channel)
+        launchChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, launchName)
+        launchChannel?.setMethodCallHandler { call, result ->
+            if (call.method == "consumeLaunch") {
+                val value = launchUri ?: intent?.data?.toString()
+                launchUri = null
+                result.success(value)
+            } else {
+                result.notImplemented()
+            }
+        }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, widgetName)
             .setMethodCallHandler { call, result ->
-                if (call.method == "consumeLaunch") {
-                    val value = launchUri ?: intent?.data?.toString()
-                    launchUri = null
-                    result.success(value)
+                if (call.method == "publishToday") {
+                    val total = call.argument<String>("total") ?: "₹0"
+                    QuickAddWidget.publishToday(this, total)
+                    result.success(null)
                 } else {
                     result.notImplemented()
                 }

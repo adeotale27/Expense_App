@@ -75,39 +75,67 @@ class PlatformLocationProvider implements LocationProvider {
 
   @override
   Future<bool> hasPermission() async {
+    final geo = await Geolocator.checkPermission();
+    if (geo == LocationPermission.always || geo == LocationPermission.whileInUse) {
+      return true;
+    }
     final status = await Permission.locationWhenInUse.status;
     return status.isGranted || status.isLimited;
   }
 
   @override
   Future<bool> requestPermission() async {
+    final serviceOn = await Geolocator.isLocationServiceEnabled();
+    if (!serviceOn) {
+      await Geolocator.openLocationSettings();
+    }
+    var geo = await Geolocator.checkPermission();
+    if (geo == LocationPermission.denied) {
+      geo = await Geolocator.requestPermission();
+    }
+    if (geo == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
+      return false;
+    }
+    if (geo == LocationPermission.denied) return false;
     final whenInUse = await Permission.locationWhenInUse.request();
-    if (!whenInUse.isGranted && !whenInUse.isLimited) return false;
-    await Permission.locationAlways.request();
+    if (!whenInUse.isGranted && !whenInUse.isLimited) {
+      return geo == LocationPermission.always || geo == LocationPermission.whileInUse;
+    }
+    final always = await Permission.locationAlways.status;
+    if (!always.isGranted) {
+      await Permission.locationAlways.request();
+    }
     return true;
   }
 
   @override
   Future<GeoFix?> getCurrentLocation() async {
-    final enabled = await Geolocator.isLocationServiceEnabled();
-    if (!enabled) return null;
-    final pos = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.low),
-    );
-    return GeoFix(
-      latitude: pos.latitude,
-      longitude: pos.longitude,
-      accuracy: pos.accuracy,
-      timestamp: pos.timestamp,
-    );
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) return null;
+      if (!await hasPermission()) return null;
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
+      );
+      return GeoFix(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        accuracy: pos.accuracy,
+        timestamp: pos.timestamp,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
   Future<void> startMonitoring() async {
+    if (!await hasPermission()) return;
     await _sub?.cancel();
     const settings = LocationSettings(
       accuracy: LocationAccuracy.low,
-      distanceFilter: 150,
+      distanceFilter: 80,
     );
     _sub = Geolocator.getPositionStream(locationSettings: settings).listen((p) {
       _controller.add(

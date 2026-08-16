@@ -8,6 +8,7 @@ import '../../core/utils/ids.dart';
 import '../../core/utils/money.dart';
 import '../../domain/entities/entities.dart';
 import '../../domain/enums/enums.dart';
+import 'add_friend_sheet.dart';
 import '../shared/action_sheet.dart';
 import '../shared/widgets.dart';
 
@@ -24,7 +25,7 @@ class PeopleScreen extends ConsumerWidget {
         actions: [
           IconButton(
             tooltip: 'Add friend',
-            onPressed: () => _addPerson(context, ref),
+            onPressed: () => showAddFriendSheet(context, ref),
             icon: const Icon(Icons.person_add_alt),
           ),
         ],
@@ -34,7 +35,7 @@ class PeopleScreen extends ConsumerWidget {
               title: 'Split like Splitwise',
               subtitle: 'Add a friend, log who paid, then settle when you actually transfer money.',
               action: FilledButton(
-                onPressed: () => _addPerson(context, ref),
+                onPressed: () => showAddFriendSheet(context, ref),
                 child: const Text('Add friend'),
               ),
             )
@@ -113,94 +114,6 @@ class PeopleScreen extends ConsumerWidget {
   }
 }
 
-Future<void> _addPerson(BuildContext context, WidgetRef ref) async {
-  final name = TextEditingController();
-  final created = await showModalBottomSheet<Person>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (ctx) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.viewInsetsOf(ctx).bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-              Text("Who's this?", style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              const Text('Then you can log I paid / they paid / split equally — same idea as Splitwise, on this device.'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: name,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () async {
-                if (name.text.trim().isEmpty) return;
-                final now = DateTime.now().toUtc();
-                final person = Person(
-                  id: newId(),
-                  userId: ref.read(userIdProvider),
-                  name: name.text.trim(),
-                  createdAt: now,
-                  updatedAt: now,
-                  deviceId: ref.read(deviceIdProvider),
-                );
-                await ref.read(personRepoProvider).upsert(person);
-                if (ctx.mounted) Navigator.pop(ctx, person);
-              },
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-  if (created == null || !context.mounted) return;
-  await _firstTransaction(context, ref, created);
-}
-
-Future<void> _firstTransaction(BuildContext context, WidgetRef ref, Person person) async {
-  final kind = await showModalBottomSheet<LedgerType>(
-    context: context,
-    showDragHandle: true,
-    builder: (ctx) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('What happened?', style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, LedgerType.lent),
-                child: const Text('I paid for them'),
-              ),
-              const SizedBox(height: 8),
-              FilledButton.tonal(
-                onPressed: () => Navigator.pop(ctx, LedgerType.borrowed),
-                child: const Text('They paid for me'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => Navigator.pop(ctx, LedgerType.adjustment),
-                child: const Text('Split equally'),
-              ),
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Skip for now')),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-  if (kind == null || !context.mounted) return;
-  await _amountSheet(context, ref, person.id, kind);
-}
-
 Future<void> _amountSheet(
   BuildContext context,
   WidgetRef ref,
@@ -214,12 +127,13 @@ Future<void> _amountSheet(
         : '${(suggestedMinor / 100).round()}',
   );
   final title = switch (type) {
-    LedgerType.lent => 'I paid',
-    LedgerType.borrowed => 'They paid',
+    LedgerType.lent => 'Given',
+    LedgerType.borrowed => 'Borrowed',
     LedgerType.adjustment => 'Split equally — bill total',
     LedgerType.settlement => 'Settle up',
     LedgerType.repayment => 'Repayment',
   };
+  var date = DateTime.now();
   final ok = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -227,22 +141,41 @@ Future<void> _amountSheet(
     builder: (ctx) {
       return Padding(
         padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.viewInsetsOf(ctx).bottom + 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-            if (type == LedgerType.settlement)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text('Mark the amount you actually transferred outside SpendPing.'),
-              ),
-            AmountField(controller: amount, large: false, autofocus: true),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Save'),
-            ),
-          ],
+        child: StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                if (type == LedgerType.settlement)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text('Mark the amount you actually transferred outside SpendPing.'),
+                  ),
+                AmountField(controller: amount, large: false, autofocus: true),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.event_outlined),
+                  title: const Text('Date'),
+                  subtitle: Text('${date.day}/${date.month}/${date.year}'),
+                  trailing: const Text('Change'),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: date,
+                      firstDate: DateTime(date.year - 5),
+                      lastDate: DateTime(date.year + 1),
+                    );
+                    if (picked != null) setLocal(() => date = picked);
+                  },
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
         ),
       );
     },
@@ -250,6 +183,7 @@ Future<void> _amountSheet(
   final major = double.tryParse(amount.text) ?? 0;
   if (ok != true || major <= 0) return;
   final now = DateTime.now().toUtc();
+  final when = DateTime(date.year, date.month, date.day, now.toLocal().hour, now.toLocal().minute).toUtc();
   var entryType = type;
   var entryMajor = major;
   String? note;
@@ -280,7 +214,7 @@ Future<void> _amountSheet(
           amount: Money.fromMajor(entryMajor),
           direction: direction,
           type: entryType,
-          date: now,
+          date: when,
           note: note,
           createdAt: now,
           updatedAt: now,
@@ -389,14 +323,14 @@ class _PersonDetailScreenState extends ConsumerState<PersonDetailScreen> {
                               Expanded(
                                 child: FilledButton(
                                   onPressed: () => _amountSheet(context, ref, widget.id, LedgerType.lent),
-                                  child: const Text('I paid'),
+                                  child: const Text('Given'),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: FilledButton.tonal(
                                   onPressed: () => _amountSheet(context, ref, widget.id, LedgerType.borrowed),
-                                  child: const Text('They paid'),
+                                  child: const Text('Borrowed'),
                                 ),
                               ),
                             ],
