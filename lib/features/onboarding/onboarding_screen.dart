@@ -26,8 +26,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       'Location helps us understand when you visit places where you may have spent money. You can skip this and track manually.',
     ),
     (
-      'Notifications',
-      'We remind you at the right moments — never constantly.',
+      'When you leave a shop or pump',
+      'We ask if you spent. GPS never records money by itself.',
     ),
       (
         'Make it smarter',

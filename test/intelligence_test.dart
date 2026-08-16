@@ -155,6 +155,7 @@ void main() {
       places: [place],
     );
     expect(exit?.entered, isFalse);
+    expect(exit?.dwell, const Duration(hours: 1));
   });
 
   test('prompt manager cooldown after not this time', () async {

@@ -46,16 +46,12 @@ class QuickAddWidget : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.quick_add_widget)
             views.setTextViewText(R.id.txt_today_total, today)
             val open = Intent(context, WidgetComposeActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             var flags = PendingIntent.FLAG_UPDATE_CURRENT
             if (Build.VERSION.SDK_INT >= 23) {
                 flags = flags or PendingIntent.FLAG_IMMUTABLE
             }
-            views.setOnClickPendingIntent(
-                R.id.widget_root,
-                PendingIntent.getActivity(context, 42, open, flags)
-            )
             views.setOnClickPendingIntent(
                 R.id.btn_add,
                 PendingIntent.getActivity(context, 43, open, flags)

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/utils/ids.dart';
 import '../core/utils/money.dart';
 import '../domain/entities/entities.dart';
+import '../domain/enums/enums.dart';
 import 'providers.dart';
 
 const launchChannel = MethodChannel('spendping/launch');
@@ -16,6 +17,43 @@ Future<void> publishTodayTotal(int minorUnits) async {
       'total': Money(minorUnits: minorUnits).format(),
     });
   } catch (_) {}
+}
+
+Future<void> importWidgetInbox(WidgetRef ref) async {
+  if (ref.read(sessionProfileProvider) == null) return;
+  try {
+    final raw = await widgetChannel.invokeMethod<List<dynamic>>('drainInbox');
+    if (raw == null || raw.isEmpty) return;
+    for (final item in raw) {
+      final map = Map<String, dynamic>.from(item as Map);
+      final amount = map['amountMinor'];
+      final minor = amount is int ? amount : int.tryParse('$amount') ?? 0;
+      if (minor <= 0) continue;
+      await recordNamedSpend(
+        ref,
+        id: map['id'] as String?,
+        amountMinor: minor,
+        what: map['what'] as String?,
+      );
+    }
+  } catch (_) {}
+}
+
+void listenForWidgetSpends(WidgetRef ref) {
+  widgetChannel.setMethodCallHandler((call) async {
+    if (call.method != 'widgetSpend') return;
+    if (ref.read(sessionProfileProvider) == null) return;
+    final args = Map<String, dynamic>.from(call.arguments as Map);
+    final amount = args['amountMinor'];
+    final minor = amount is int ? amount : int.tryParse('$amount') ?? 0;
+    if (minor <= 0) return;
+    await recordNamedSpend(
+      ref,
+      id: args['id'] as String?,
+      amountMinor: minor,
+      what: args['what'] as String?,
+    );
+  });
 }
 
 Future<void> handleLaunchUri(WidgetRef ref, String raw) async {
@@ -52,6 +90,7 @@ Future<Expense?> recordNamedSpend(
   WidgetRef ref, {
   required int amountMinor,
   String? what,
+  String? id,
 }) async {
   await ref.read(categoryRepoProvider).ensureDefaults();
   final cats = await ref.read(categoryRepoProvider).all();
@@ -67,7 +106,7 @@ Future<Expense?> recordNamedSpend(
   final settings = await ref.read(settingsRepoProvider).get(ref.read(userIdProvider));
   final now = DateTime.now().toUtc();
   final expense = Expense(
-    id: newId(),
+    id: (id != null && id.isNotEmpty) ? id : newId(),
     userId: ref.read(userIdProvider),
     amount: Money(minorUnits: amountMinor),
     categoryId: cat.id,
@@ -77,6 +116,7 @@ Future<Expense?> recordNamedSpend(
     createdAt: now,
     updatedAt: now,
     deviceId: ref.read(deviceIdProvider),
+    source: ExpenseSource.shortcut,
   );
   await ref.read(expenseRepoProvider).upsert(expense);
   await ref.read(settingsRepoProvider).save(settings.copyWith(lastCategoryId: cat.id));

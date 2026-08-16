@@ -23,6 +23,28 @@ flutter build appbundle --release \
 
 Until `google-services.json` exists, Gradle skips the Google Services plugin. Continue with Google still works on-device using the Google account picker; cloud restore needs Firebase.
 
+## Local testing (no Play Store)
+
+You can test Google login from Android Studio / `flutter run`. Publishing is not required.
+
+1. Package name must stay `com.spendping.spendping`.
+2. Print the **debug** SHA-1 and add it in Firebase → Project settings → your Android app:
+
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+```
+
+3. Put `google-services.json` in `android/app/`.
+4. Create an OAuth **Web client** and run:
+
+```bash
+flutter run --dart-define=GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
+```
+
+If sign-in shows “developer error” / code 10, the SHA-1 of the keystore that signed this install is missing in Firebase. A Play upload uses a different SHA-1 (Play App Signing) — that is only needed after you publish, not for local debug.
+
+Sign in with Apple is shown only on iPhone/iPad. iOS Google/Apple setup is unchanged (`GoogleService-Info.plist`, URL scheme).
+
 ## 2. Signing for Play
 
 ```bash
@@ -64,4 +86,6 @@ Without a key, the OS reverse-geocoder is used (street names, weaker for shops).
 
 ## 5. Home widget
 
-Tap **Add spend** on the widget. Type the amount (keyboard), choose **Food** or **Fuel**, or **Other** (cursor moves to type a name), then **Save**. That row appears in today’s spends.
+Tap **Add spend** on the widget (not the today total). A small sheet opens: type amount, Food / Fuel / Other, **Save**. That writes the spend on the phone and closes. It does **not** open the SpendPing app. If the app is already running, the new row appears on Home; otherwise it is imported the next time you open SpendPing.
+
+On iOS the widget still opens the in-app compose screen (WidgetKit cannot type an amount on the home screen).

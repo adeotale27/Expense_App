@@ -3,6 +3,7 @@ package com.spendping.spendping
 import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
@@ -23,6 +24,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        FlutterEngineCache.getInstance().put(WidgetSpendWriter.ENGINE_ID, flutterEngine)
         launchUri = intent?.data?.toString() ?: launchUri
         launchChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, launchName)
         launchChannel?.setMethodCallHandler { call, result ->
@@ -50,6 +52,7 @@ class MainActivity : FlutterActivity() {
                         val key = appInfo.metaData?.getString("com.google.android.geo.API_KEY")
                         result.success(key)
                     }
+                    "drainInbox" -> result.success(WidgetSpendWriter.drainInbox(this))
                     else -> result.notImplemented()
                 }
             }

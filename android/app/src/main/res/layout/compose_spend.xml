@@ -96,5 +96,13 @@
             android:layout_marginTop="24dp"
             android:text="Save"
             android:textAllCaps="false" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:text="Saves to SpendPing. Does not open the app."
+            android:textColor="#5A6B66"
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>

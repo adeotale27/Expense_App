@@ -1,8 +1,6 @@
 package com.spendping.spendping
 
 import android.app.Activity
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.InputMethodManager
@@ -61,13 +59,7 @@ class WidgetComposeActivity : Activity() {
             } else {
                 category
             }
-            val uri = Uri.parse("spendping://quick?amount=$minor&what=${Uri.encode(what)}")
-            startActivity(
-                Intent(this, MainActivity::class.java).apply {
-                    data = uri
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                }
-            )
+            WidgetSpendWriter.save(this, minor, what)
             finish()
         }
     }

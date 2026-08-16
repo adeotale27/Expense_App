@@ -50,7 +50,7 @@ class NotificationService {
 
   Future<void> showOpportunity(ExpenseOpportunity opp, Place place) async {
     final title = '📍 ${place.name}';
-    const body = 'Did you spend anything here?';
+    const body = 'Did you spend anything? Add it now — nothing is saved until you do.';
     queue.add(opp.id);
     AppLog.notification('Prompt scheduled ${opp.id}');
     if (!ready) return;
@@ -58,18 +58,20 @@ class NotificationService {
       opp.id.hashCode,
       title,
       body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           'opportunities',
           'Expense reminders',
+          channelDescription: 'Asks after you leave a place, so you can log a spend.',
           importance: Importance.high,
           priority: Priority.high,
-          actions: [
+          visibility: NotificationVisibility.public,
+          actions: const [
             AndroidNotificationAction('yes', 'Yes, record it'),
             AndroidNotificationAction('no', 'Not this time'),
           ],
         ),
-        iOS: DarwinNotificationDetails(categoryIdentifier: 'opportunity'),
+        iOS: const DarwinNotificationDetails(categoryIdentifier: 'opportunity'),
       ),
       payload: 'opp:${opp.id}',
     );

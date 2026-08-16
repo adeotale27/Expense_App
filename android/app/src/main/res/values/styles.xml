@@ -15,7 +15,11 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
-    <style name="Theme.SpendPing.Compose" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+    <style name="Theme.SpendPing.Compose" parent="@android:style/Theme.DeviceDefault.Light.Dialog">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:windowMinWidthMajor">92%</item>
+        <item name="android:windowMinWidthMinor">92%</item>
         <item name="android:statusBarColor">#0FBE8F</item>
         <item name="android:navigationBarColor">#F3FBF8</item>
         <item name="android:windowBackground">#F3FBF8</item>

@@ -48,6 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _bootstrap() async {
     await ref.read(categoryRepoProvider).ensureDefaults();
+    await importWidgetInbox(ref);
     final settings = await ref.read(settingsRepoProvider).get(ref.read(userIdProvider));
     if (!settings.onboardingComplete) {
       await ref.read(settingsRepoProvider).save(settings.copyWith(onboardingComplete: true));
@@ -121,10 +122,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _recordQuick() async {
-    if (major <= 0) {
-      context.push('/add');
-      return;
-    }
+    if (major <= 0) return;
     final cats = ref.read(categoriesProvider).valueOrNull ?? [];
     final settings = ref.read(settingsProvider).valueOrNull;
     final expenses = ref.read(recentExpensesProvider).valueOrNull ?? [];
@@ -230,7 +228,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             _LocationCard(
               runtime: runtime,
               here: here,
@@ -273,8 +271,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 10),
                   FilledButton(
-                    onPressed: _recordQuick,
-                    child: Text(major > 0 ? 'Record ₹${amount.text}' : 'Open full add'),
+                    onPressed: major > 0 ? _recordQuick : null,
+                    child: Text(major > 0 ? 'Record ₹${amount.text}' : 'Enter an amount'),
                   ),
                 ],
               ),
@@ -356,40 +354,35 @@ class _LocationCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final listening = runtime.permissionGranted || runtime.monitoring;
     if (!listening && here == null && suggestion == null && topOpp == null) {
-      return QuietCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Location intelligence',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'After you allow location, SpendPing watches visits and notifies you. GPS never creates an expense on its own.',
-            ),
-            const SizedBox(height: 12),
-            FilledButton.tonal(
-              onPressed: onEnable,
-              child: const Text('Enable location intelligence'),
-            ),
-          ],
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        dense: true,
+        leading: const Icon(Icons.place_outlined),
+        title: const Text('Visit pings'),
+        subtitle: const Text('Optional. GPS never records a spend.'),
+        trailing: TextButton(
+          onPressed: onEnable,
+          child: const Text('Enable'),
         ),
       );
     }
 
-    final title = here != null
-        ? '📍 ${here!.name}'
-        : suggestion?.headline ??
-            (topOpp != null
-                ? '📍 ${place?.name ?? topOpp?.suggestedMerchantName ?? 'A place'}'
-                : 'Watching this area');
-    final body = suggestion?.body ??
-        (topOpp != null
-            ? 'Did you spend anything here?'
-            : here != null
-                ? 'SpendPing noticed a visit. Nothing is recorded until you confirm.'
-                : 'Location is on. Stay somewhere a few minutes and we will ask if you spent.');
+    if (suggestion == null && topOpp == null) {
+      if (here == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Text(
+          'At ${here!.name}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      );
+    }
+
+    final title = suggestion?.headline ??
+        'Left ${place?.name ?? topOpp?.suggestedMerchantName ?? 'a place'}';
+    final body = suggestion?.body ?? 'Did you spend anything?';
 
     return QuietCard(
       child: Column(
