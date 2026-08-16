@@ -18,12 +18,14 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
     super.key,
     this.opportunity,
     this.initialAmountMinor,
+    this.initialWhat,
     this.placeId,
     this.expense,
   });
 
   final ExpenseOpportunity? opportunity;
   final int? initialAmountMinor;
+  final String? initialWhat;
   final String? placeId;
   final Expense? expense;
 
@@ -69,6 +71,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       step = 1;
     } else if (widget.initialAmountMinor != null) {
       amount.text = '${(widget.initialAmountMinor! / 100).round()}';
+    }
+    if (widget.initialWhat != null && widget.initialWhat!.trim().isNotEmpty) {
+      note.text = widget.initialWhat!.trim();
     }
     placeId ??= widget.placeId ?? widget.opportunity?.placeId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -200,6 +205,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
     if (opp?.suggestedMerchantName != null && merchant.text.isEmpty) {
       merchant.text = opp!.suggestedMerchantName!;
+    }
+    if (widget.initialWhat != null && categoryId == null) {
+      final needle = widget.initialWhat!.trim().toLowerCase();
+      categoryId = cats.where((c) => c.name.toLowerCase() == needle).firstOrNull?.id ??
+          cats.where((c) => c.name.toLowerCase().contains(needle)).firstOrNull?.id;
     }
     categoryId ??= settings?.lastCategoryId;
     if (widget.expense == null && method == PaymentMethod.upi) {

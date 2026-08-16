@@ -33,6 +33,7 @@ enum ExpenseSort { newest, oldest, highest, lowest }
 
 abstract class ExpenseRepository {
   Stream<List<Expense>> watchRecent({int limit = 50});
+  Stream<List<Expense>> watchBetween(DateTime from, DateTime to);
   Future<List<Expense>> list(ExpenseQuery query);
   Future<Expense?> getById(String id);
   Future<void> upsert(Expense expense);

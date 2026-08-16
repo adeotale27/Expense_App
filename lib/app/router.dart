@@ -59,6 +59,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/add',
         builder: (_, s) => AddExpenseScreen(
           initialAmountMinor: int.tryParse(s.uri.queryParameters['amount'] ?? ''),
+          initialWhat: s.uri.queryParameters['what'],
           placeId: s.uri.queryParameters['placeId'],
         ),
       ),

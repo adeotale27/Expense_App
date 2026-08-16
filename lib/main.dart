@@ -1,18 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'app/providers.dart';
+import 'app/quick_spend.dart';
 import 'data/local/app_database.dart';
 import 'data/remote/auth_service.dart';
 import 'data/sync/sync_engine.dart';
 import 'location/location_provider.dart';
 import 'notifications/notification_service.dart';
-
-const _launchChannel = MethodChannel('spendping/launch');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -57,12 +55,9 @@ Future<void> main() async {
   };
 
   try {
-    final launch = await _launchChannel.invokeMethod<String>('consumeLaunch');
-    if (launch != null && launch.contains('add')) {
-      final uri = Uri.tryParse(launch);
-      final amount = uri?.queryParameters['amount'];
-      container.read(pendingRouteProvider.notifier).state =
-          amount == null ? '/add' : '/add?amount=$amount';
+    final launch = await launchChannel.invokeMethod<String>('consumeLaunch');
+    if (launch != null && launch.isNotEmpty) {
+      container.read(pendingLaunchUriProvider.notifier).state = launch;
     }
   } catch (_) {}
 

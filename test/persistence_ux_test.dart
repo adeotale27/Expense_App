@@ -119,6 +119,40 @@ void main() {
     expect(await ledger.balanceMinorFor('rahul'), 0);
   });
 
+  test('given to a friend on a chosen date', () async {
+    final person = Person(
+      id: 'neha',
+      userId: 'u',
+      name: 'Neha',
+      createdAt: now,
+      updatedAt: now,
+      deviceId: 'd',
+    );
+    await people.upsert(person);
+    final when = DateTime.utc(2026, 8, 10, 12);
+    await ledger.add(
+      LedgerEntry(
+        id: 'g1',
+        userId: 'u',
+        personId: 'neha',
+        amount: Money(minorUnits: 40000),
+        direction: LedgerDirection.owedToUser,
+        type: LedgerType.lent,
+        date: when,
+        note: 'Given',
+        createdAt: now,
+        updatedAt: now,
+        deviceId: 'd',
+      ),
+    );
+    expect(await ledger.balanceMinorFor('neha'), 40000);
+    final rows = await ledger.watchForPerson('neha').first;
+    expect(rows.single.date.year, 2026);
+    expect(rows.single.date.month, 8);
+    expect(rows.single.date.day, 10);
+    expect(rows.single.note, 'Given');
+  });
+
   test('places remember rename forget', () async {
     final place = Place(
       id: 'mall',

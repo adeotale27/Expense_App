@@ -36,6 +36,12 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="spendping" android:host="add"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="spendping" android:host="quick"/>
+            </intent-filter>
         </activity>
         <receiver
             android:name=".QuickAddWidget"
@@ -43,6 +49,7 @@
             android:label="SpendPing Quick Add">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="com.spendping.spendping.WIDGET_TAP"/>
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

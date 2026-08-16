@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/utils/ids.dart';
 import '../../core/utils/money.dart';
 import '../../domain/entities/entities.dart';
 import '../../domain/enums/enums.dart';
@@ -184,5 +185,103 @@ class PlaceDetailScreen extends ConsumerWidget {
             ),
           );
     }
+  }
+}
+
+Future<void> showRememberPlaceSheet(BuildContext context, WidgetRef ref) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => const _RememberPlaceForm(),
+  );
+}
+
+class _RememberPlaceForm extends ConsumerStatefulWidget {
+  const _RememberPlaceForm();
+
+  @override
+  ConsumerState<_RememberPlaceForm> createState() => _RememberPlaceFormState();
+}
+
+class _RememberPlaceFormState extends ConsumerState<_RememberPlaceForm> {
+  final name = TextEditingController();
+  bool saving = false;
+  String? error;
+
+  @override
+  void dispose() {
+    name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final label = name.text.trim();
+    if (label.isEmpty || saving) return;
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    final loc = await ref.read(locationProviderAdapter).getCurrentLocation();
+    if (loc == null) {
+      setState(() {
+        saving = false;
+        error = 'Turn on location so we can pin this place.';
+      });
+      return;
+    }
+    final now = DateTime.now().toUtc();
+    await ref.read(placeRepoProvider).upsert(
+          Place(
+            id: newId(),
+            userId: ref.read(userIdProvider),
+            name: label,
+            type: PlaceType.unknown,
+            latitude: loc.latitude,
+            longitude: loc.longitude,
+            radius: 150,
+            userConfirmedName: true,
+            geofenceEnabled: true,
+            visitCount: 1,
+            firstVisitedAt: now,
+            lastVisitedAt: now,
+            createdAt: now,
+            updatedAt: now,
+            deviceId: ref.read(deviceIdProvider),
+          ),
+        );
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Remember this place', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          const Text('Uses your current GPS. SpendPing still will not log an expense until you confirm.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: name,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Name'),
+          ),
+          if (error != null) ...[
+            const SizedBox(height: 8),
+            Text(error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _save,
+            child: Text(saving ? 'Saving…' : 'Save place'),
+          ),
+        ],
+      ),
+    );
   }
 }
